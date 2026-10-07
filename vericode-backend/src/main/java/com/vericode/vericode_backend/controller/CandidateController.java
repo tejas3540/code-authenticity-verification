@@ -34,10 +34,10 @@ public class CandidateController {
     @PostMapping
     public ResponseEntity<CandidateResponseDTO> save(@Valid  @RequestBody CandidateRequestDTO request) {
 
-        Candidate savedCandidate= candidateService.save(candidate);
-        return  ResponseEntity
+        CandidateResponseDTO response = candidateService.save(request);
+        return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(response);;
+                .body(response);
 
     }
     @PutMapping
