@@ -1,9 +1,7 @@
 package com.vericode.vericode_backend.dto;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-
 public class CandidateResponseDTO {
+
     private Integer id;
     private String name;
     private String email;
@@ -16,6 +14,7 @@ public class CandidateResponseDTO {
         this.name = name;
         this.email = email;
     }
+
     public Integer getId() {
         return id;
     }
