@@ -2,10 +2,15 @@ package com.vericode.vericode_backend.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 
 public class CandidateRequestDTO {
 
     @NotBlank(message = "Enter Name")
+    @Pattern(
+            regexp = "^[A-Za-z ]+$",
+            message = "Name can contain only letters and spaces"
+    )
     private String name;
 
     @NotBlank(message = "Enter email")
