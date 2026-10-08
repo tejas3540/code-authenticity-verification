@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import "./App.css";
 
 const AUTH_API = "http://localhost:8080/Auth";
@@ -317,7 +317,7 @@ function QuestionManager({ onClose }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const loadQuestions = async () => {
+  const loadQuestions = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(QUESTION_API);
@@ -510,3 +510,4 @@ function QuestionManager({ onClose }) {
   );
 }
 
+\nexport default App;\n
