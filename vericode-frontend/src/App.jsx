@@ -216,6 +216,21 @@ function Field({ label, name, type = "text", value, onChange }) {
   );
 }
 
+function FeatureCard({ title, text, action, onAction }) {
+  return (
+    <section className="panel feature-card">
+      <p className="section-label">VERICODE</p>
+      <h3>{title}</h3>
+      <p>{text}</p>
+      {action && (
+        <button className="primary-button" type="button" onClick={onAction}>
+          {action}
+        </button>
+      )}
+    </section>
+  );
+}
+
 function Dashboard({ user, onLogout }) {
   const isStudent = user.role === "STUDENT";
   const isRecruiter = user.role === "RECRUITER";
@@ -332,7 +347,7 @@ function QuestionManager({ onClose }) {
 
   useEffect(() => {
     loadQuestions();
-  }, []);
+  }, [loadQuestions]);
 
   const handleChange = (event) => {
     setForm({ ...form, [event.target.name]: event.target.value });
@@ -510,4 +525,4 @@ function QuestionManager({ onClose }) {
   );
 }
 
-\nexport default App;\n
+export default App;
