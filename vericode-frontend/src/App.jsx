@@ -343,7 +343,7 @@ function QuestionManager({ onClose }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadQuestions();
