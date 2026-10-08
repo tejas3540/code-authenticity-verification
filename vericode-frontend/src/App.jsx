@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import "./App.css";
 
 const AUTH_API = "http://localhost:8080/Auth";
+const QUESTION_API = "http://localhost:8080/Questions";
 
 const emptyStudent = {
   name: "",
@@ -218,6 +219,7 @@ function Field({ label, name, type = "text", value, onChange }) {
 function Dashboard({ user, onLogout }) {
   const isStudent = user.role === "STUDENT";
   const isRecruiter = user.role === "RECRUITER";
+  const [showQuestionManager, setShowQuestionManager] = useState(false);
 
   return (
     <div className="dashboard-shell">
@@ -263,6 +265,12 @@ function Dashboard({ user, onLogout }) {
             <>
               <FeatureCard title="Assessments" text="Create and manage coding assessments." />
               <FeatureCard title="Candidates" text="View candidates and assessment submissions." />
+              <FeatureCard
+                title="Manage Questions"
+                text="Create, edit, and delete coding questions for your assessments."
+                action="Open Question Manager"
+                onAction={() => setShowQuestionManager(true)}
+              />
               <FeatureCard title="Behavior Tracking" text="Review coding-session behavior signals." />
               <FeatureCard title="Authenticity Analysis" text="Review authenticity scores, risk levels, and evidence." />
             </>
@@ -281,19 +289,224 @@ function Dashboard({ user, onLogout }) {
             </>
           )}
         </div>
+
+        {isRecruiter && showQuestionManager && (
+          <QuestionManager onClose={() => setShowQuestionManager(false)} />
+        )}
       </main>
     </div>
   );
 }
 
-function FeatureCard({ title, text }) {
+function QuestionManager({ onClose }) {
+  const emptyQuestion = {
+    title: "",
+    description: "",
+    inputDescription: "",
+    outputDescription: "",
+    constraints: "",
+    timeLimitSeconds: 60,
+    language: "JAVA",
+  };
+
+  const [questions, setQuestions] = useState([]);
+  const [form, setForm] = useState(emptyQuestion);
+  const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const loadQuestions = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(QUESTION_API);
+      if (!response.ok) throw new Error("Unable to load questions.");
+      setQuestions(await response.json());
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadQuestions();
+  }, []);
+
+  const handleChange = (event) => {
+    setForm({ ...form, [event.target.name]: event.target.value });
+    setMessage("");
+    setError("");
+  };
+
+  const resetForm = () => {
+    setForm(emptyQuestion);
+    setEditingId(null);
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setMessage("");
+    setError("");
+
+    const editing = editingId !== null;
+    const url = editing ? `${QUESTION_API}/${editingId}` : QUESTION_API;
+
+    try {
+      const response = await fetch(url, {
+        method: editing ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          timeLimitSeconds: Number(form.timeLimitSeconds),
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Unable to save question.");
+
+      setMessage(editing ? "Question updated successfully." : "Question created successfully.");
+      resetForm();
+      await loadQuestions();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const editQuestion = (question) => {
+    setEditingId(question.id);
+    setForm({
+      title: question.title,
+      description: question.description,
+      inputDescription: question.inputDescription,
+      outputDescription: question.outputDescription,
+      constraints: question.constraints,
+      timeLimitSeconds: question.timeLimitSeconds,
+      language: question.language,
+    });
+  };
+
+  const deleteQuestion = async (id) => {
+    if (!window.confirm("Delete this question?")) return;
+
+    try {
+      const response = await fetch(`${QUESTION_API}/${id}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Unable to delete question.");
+      setMessage("Question deleted successfully.");
+      await loadQuestions();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   return (
-    <section className="panel feature-card">
-      <p className="section-label">VERICODE</p>
-      <h3>{title}</h3>
-      <p>{text}</p>
+    <section className="question-manager panel">
+      <div className="panel-heading">
+        <div>
+          <p className="section-label">RECRUITER QUESTION BANK</p>
+          <h3>{editingId ? "Edit coding question" : "Add coding question"}</h3>
+        </div>
+        <button className="text-button" type="button" onClick={onClose}>Close</button>
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <label>
+          Question title
+          <input name="title" value={form.title} onChange={handleChange} placeholder="e.g. Two Sum" required />
+        </label>
+        <label>
+          Problem description
+          <textarea name="description" value={form.description} onChange={handleChange} rows="4" required />
+        </label>
+        <label>
+          Input description
+          <textarea name="inputDescription" value={form.inputDescription} onChange={handleChange} rows="3" required />
+        </label>
+        <label>
+          Output description
+          <textarea name="outputDescription" value={form.outputDescription} onChange={handleChange} rows="3" required />
+        </label>
+        <label>
+          Constraints
+          <textarea name="constraints" value={form.constraints} onChange={handleChange} rows="3" required />
+        </label>
+        <label>
+          Time limit (seconds)
+          <input type="number" min="1" name="timeLimitSeconds" value={form.timeLimitSeconds} onChange={handleChange} required />
+        </label>
+        <label>
+          Language
+          <select name="language" value={form.language} onChange={handleChange}>
+            <option value="JAVA">Java</option>
+          </select>
+        </label>
+        <div className="actions">
+          <button className="primary-button" type="submit" disabled={saving}>
+            {saving ? "Saving..." : editingId ? "Update question" : "Add question"}
+          </button>
+          {editingId && (
+            <button className="text-button" type="button" onClick={resetForm}>Cancel edit</button>
+          )}
+        </div>
+      </form>
+
+      {message && <div className="alert success">{message}</div>}
+      {error && <div className="alert error">{error}</div>}
+
+      <div className="question-list">
+        <div className="panel-heading">
+          <div>
+            <p className="section-label">QUESTION BANK</p>
+            <h3>Existing questions</h3>
+          </div>
+          <button className="text-button" type="button" onClick={loadQuestions}>Refresh</button>
+        </div>
+
+        {loading ? (
+          <div className="empty-state">Loading questions...</div>
+        ) : questions.length === 0 ? (
+          <div className="empty-state">
+            <strong>No questions yet</strong>
+            <span>Add the first coding question above.</span>
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Question</th>
+                  <th>Language</th>
+                  <th>Time</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {questions.map((question) => (
+                  <tr key={question.id}>
+                    <td><span className="id-badge">#{question.id}</span></td>
+                    <td className="candidate-name">{question.title}</td>
+                    <td>{question.language}</td>
+                    <td>{question.timeLimitSeconds}s</td>
+                    <td>
+                      <div className="actions">
+                        <button className="action-button edit" type="button" onClick={() => editQuestion(question)}>Edit</button>
+                        <button className="action-button delete" type="button" onClick={() => deleteQuestion(question.id)}>Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
 
-export default App;
