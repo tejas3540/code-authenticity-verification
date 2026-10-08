@@ -1,412 +1,298 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
 
-const CANDIDATE_API = "http://localhost:8080/Candidates";
-const QUESTION_API = "http://localhost:8080/Questions";
+const AUTH_API = "http://localhost:8080/Auth";
 
-const emptyCandidateForm = {
+const emptyStudent = {
   name: "",
   email: "",
+  password: "",
+  college: "",
+  currentStudyField: "",
 };
 
-const emptyQuestionForm = {
-  title: "",
-  description: "",
-  inputDescription: "",
-  outputDescription: "",
-  constraints: "",
-  timeLimitSeconds: 60,
-  language: "JAVA",
+const emptyRecruiter = {
+  recruiterName: "",
+  email: "",
+  password: "",
+  organizationName: "",
 };
 
 function App() {
-  const [candidates, setCandidates] = useState([]);
-  const [questions, setQuestions] = useState([]);
-  const [candidateForm, setCandidateForm] = useState(emptyCandidateForm);
-  const [questionForm, setQuestionForm] = useState(emptyQuestionForm);
-  const [editingCandidateId, setEditingCandidateId] = useState(null);
-  const [editingQuestionId, setEditingQuestionId] = useState(null);
-  const [loadingCandidates, setLoadingCandidates] = useState(true);
-  const [loadingQuestions, setLoadingQuestions] = useState(true);
-  const [savingCandidate, setSavingCandidate] = useState(false);
-  const [savingQuestion, setSavingQuestion] = useState(false);
+  const [role, setRole] = useState("STUDENT");
+  const [mode, setMode] = useState("login");
+  const [form, setForm] = useState(emptyStudent);
+  const [user, setUser] = useState(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-
-  const loadCandidates = useCallback(async () => {
-    setLoadingCandidates(true);
-
-    try {
-      const response = await fetch(CANDIDATE_API);
-
-      if (!response.ok) {
-        throw new Error("Unable to load candidates.");
-      }
-
-      setCandidates(await response.json());
-    } catch (err) {
-      setError(err.message || "Unable to connect to the backend.");
-    } finally {
-      setLoadingCandidates(false);
-    }
-  }, []);
-
-  const loadQuestions = useCallback(async () => {
-    setLoadingQuestions(true);
-
-    try {
-      const response = await fetch(QUESTION_API);
-
-      if (!response.ok) {
-        throw new Error("Unable to load questions.");
-      }
-
-      setQuestions(await response.json());
-    } catch (err) {
-      setError(err.message || "Unable to load questions.");
-    } finally {
-      setLoadingQuestions(false);
-    }
-  }, []);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadCandidates();
-    loadQuestions();
-  }, [loadCandidates, loadQuestions]);
+    fetch(`${AUTH_API}/me`, { credentials: "include" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => data && setUser(data))
+      .catch(() => {});
+  }, []);
 
-  const handleCandidateChange = (event) => {
-    setCandidateForm({
-      ...candidateForm,
-      [event.target.name]: event.target.value,
-    });
+  const selectRole = (nextRole) => {
+    setRole(nextRole);
+    setMode("login");
+    setMessage("");
+    setError("");
+    setForm(nextRole === "STUDENT" ? emptyStudent : emptyRecruiter);
+  };
+
+  const handleChange = (event) => {
+    setForm({ ...form, [event.target.name]: event.target.value });
     setMessage("");
     setError("");
   };
 
-  const handleQuestionChange = (event) => {
-    setQuestionForm({
-      ...questionForm,
-      [event.target.name]: event.target.value,
-    });
-    setMessage("");
-    setError("");
-  };
-
-  const resetCandidateForm = () => {
-    setCandidateForm(emptyCandidateForm);
-    setEditingCandidateId(null);
-  };
-
-  const resetQuestionForm = () => {
-    setQuestionForm(emptyQuestionForm);
-    setEditingQuestionId(null);
-  };
-
-  const handleCandidateSubmit = async (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    setSavingCandidate(true);
+    setLoading(true);
     setMessage("");
     setError("");
-
-    const isEditing = editingCandidateId !== null;
-    const url = isEditing
-      ? `${CANDIDATE_API}/${editingCandidateId}`
-      : CANDIDATE_API;
 
     try {
-      const response = await fetch(url, {
-        method: isEditing ? "PUT" : "POST",
+      const endpoint =
+        mode === "register"
+          ? `${AUTH_API}/register/${role === "STUDENT" ? "student" : "recruiter"}`
+          : `${AUTH_API}/login`;
+
+      const body = mode === "login" ? { ...form, role } : form;
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(candidateForm),
+        body: JSON.stringify(body),
       });
 
-      const data = await response.json();
+      const data = response.status === 204 ? null : await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Unable to save candidate.");
+        throw new Error(data?.message || "Request failed.");
       }
 
-      setMessage(
-        isEditing
-          ? "Candidate updated successfully."
-          : "Candidate created successfully."
-      );
-      resetCandidateForm();
-      await loadCandidates();
+      setUser(data);
+      setMessage(mode === "register" ? "Account created successfully." : "Login successful.");
     } catch (err) {
       setError(err.message || "Something went wrong.");
     } finally {
-      setSavingCandidate(false);
+      setLoading(false);
     }
   };
 
-  const handleQuestionSubmit = async (event) => {
-    event.preventDefault();
-    setSavingQuestion(true);
+  const logout = async () => {
+    await fetch(`${AUTH_API}/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+    setUser(null);
     setMessage("");
     setError("");
-
-    const isEditing = editingQuestionId !== null;
-    const url = isEditing
-      ? `${QUESTION_API}/${editingQuestionId}`
-      : QUESTION_API;
-
-    try {
-      const response = await fetch(url, {
-        method: isEditing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...questionForm,
-          timeLimitSeconds: Number(questionForm.timeLimitSeconds),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Unable to save question.");
-      }
-
-      setMessage(
-        isEditing
-          ? "Question updated successfully."
-          : "Question created successfully."
-      );
-      resetQuestionForm();
-      await loadQuestions();
-    } catch (err) {
-      setError(err.message || "Something went wrong.");
-    } finally {
-      setSavingQuestion(false);
-    }
   };
 
-  const handleEditCandidate = (candidate) => {
-    setEditingCandidateId(candidate.id);
-    setCandidateForm({
-      name: candidate.name,
-      email: candidate.email,
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  if (user) {
+    return <Dashboard user={user} onLogout={logout} />;
+  }
 
-  const handleEditQuestion = (question) => {
-    setEditingQuestionId(question.id);
-    setQuestionForm({
-      title: question.title,
-      description: question.description,
-      inputDescription: question.inputDescription,
-      outputDescription: question.outputDescription,
-      constraints: question.constraints,
-      timeLimitSeconds: question.timeLimitSeconds,
-      language: question.language,
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleDeleteCandidate = async (id) => {
-    if (!window.confirm("Delete this candidate?")) return;
-
-    try {
-      const response = await fetch(`${CANDIDATE_API}/${id}`, {
-        method: "DELETE",
-      });
-      const data = await response.json();
-
-      if (!response.ok) throw new Error(data.message || "Unable to delete candidate.");
-
-      setMessage("Candidate deleted successfully.");
-      await loadCandidates();
-    } catch (err) {
-      setError(err.message || "Something went wrong.");
-    }
-  };
-
-  const handleDeleteQuestion = async (id) => {
-    if (!window.confirm("Delete this question?")) return;
-
-    try {
-      const response = await fetch(`${QUESTION_API}/${id}`, {
-        method: "DELETE",
-      });
-      const data = await response.json();
-
-      if (!response.ok) throw new Error(data.message || "Unable to delete question.");
-
-      setMessage("Question deleted successfully.");
-      if (editingQuestionId === id) resetQuestionForm();
-      await loadQuestions();
-    } catch (err) {
-      setError(err.message || "Something went wrong.");
-    }
-  };
+  const isStudent = role === "STUDENT";
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="brand">
+    <div className="auth-shell">
+      <div className="auth-card">
+        <div className="brand auth-brand">
           <div className="brand-mark">VC</div>
           <div>
             <h1>VeriCode</h1>
             <span>Code Authenticity Verification System</span>
           </div>
         </div>
-        <div className="api-status"><span className="status-dot" />Backend API</div>
+
+        <div className="role-tabs">
+          {[
+            ["STUDENT", "Student"],
+            ["RECRUITER", "Recruiter / Institute"],
+            ["ADMIN", "Admin"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              className={role === value ? "role-tab active" : "role-tab"}
+              type="button"
+              onClick={() => selectRole(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="auth-heading">
+          <p className="eyebrow">{mode === "login" ? "SECURE LOGIN" : "ACCOUNT SETUP"}</p>
+          <h2>{isStudent ? "Student account" : role === "RECRUITER" ? "Recruiter account" : "Administrator account"}</h2>
+          <p>
+            {isStudent
+              ? "Access assigned coding assessments and the coding platform."
+              : role === "RECRUITER"
+                ? "Manage assessments and review coding behavior and authenticity analysis."
+                : "Manage users, assessments, permissions, and system controls."}
+          </p>
+        </div>
+
+        {role === "ADMIN" && mode === "register" && (
+          <div className="alert error">Admin accounts are managed by the system administrator.</div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          {mode === "register" && role === "STUDENT" && (
+            <>
+              <Field label="Name" name="name" value={form.name} onChange={handleChange} />
+              <Field label="Email" name="email" type="email" value={form.email} onChange={handleChange} />
+              <Field label="Password" name="password" type="password" value={form.password} onChange={handleChange} />
+              <Field label="College" name="college" value={form.college} onChange={handleChange} />
+              <Field label="Current study field" name="currentStudyField" value={form.currentStudyField} onChange={handleChange} />
+            </>
+          )}
+
+          {mode === "register" && role === "RECRUITER" && (
+            <>
+              <Field label="Recruiter name" name="recruiterName" value={form.recruiterName} onChange={handleChange} />
+              <Field label="Email" name="email" type="email" value={form.email} onChange={handleChange} />
+              <Field label="Password" name="password" type="password" value={form.password} onChange={handleChange} />
+              <Field label="Organization name" name="organizationName" value={form.organizationName} onChange={handleChange} />
+            </>
+          )}
+
+          {mode === "login" && (
+            <>
+              <Field label="Email" name="email" type="email" value={form.email} onChange={handleChange} />
+              <Field label="Password" name="password" type="password" value={form.password} onChange={handleChange} />
+            </>
+          )}
+
+          {role !== "ADMIN" && (
+            <button className="primary-button" type="submit" disabled={loading}>
+              {loading ? "Please wait..." : mode === "login" ? "Login" : "Create account"}
+            </button>
+          )}
+
+          {role === "ADMIN" && mode === "login" && (
+            <button className="primary-button" type="submit" disabled={loading}>
+              {loading ? "Please wait..." : "Admin login"}
+            </button>
+          )}
+        </form>
+
+        {role !== "ADMIN" && (
+          <button
+            className="text-button auth-switch"
+            type="button"
+            onClick={() => {
+              setMode(mode === "login" ? "register" : "login");
+              setForm(role === "STUDENT" ? emptyStudent : emptyRecruiter);
+              setMessage("");
+              setError("");
+            }}
+          >
+            {mode === "login" ? "Need an account? Register" : "Already have an account? Login"}
+          </button>
+        )}
+
+        {message && <div className="alert success">{message}</div>}
+        {error && <div className="alert error">{error}</div>}
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, name, type = "text", value, onChange }) {
+  return (
+    <label>
+      {label}
+      <input name={name} type={type} value={value || ""} onChange={onChange} required />
+    </label>
+  );
+}
+
+function Dashboard({ user, onLogout }) {
+  const isStudent = user.role === "STUDENT";
+  const isRecruiter = user.role === "RECRUITER";
+
+  return (
+    <div className="dashboard-shell">
+      <header className="topbar">
+        <div className="brand">
+          <div className="brand-mark">VC</div>
+          <div>
+            <h1>VeriCode</h1>
+            <span>{isStudent ? "Student Portal" : isRecruiter ? "Recruiter Portal" : "Admin Console"}</span>
+          </div>
+        </div>
+        <button className="text-button logout" type="button" onClick={onLogout}>Logout</button>
       </header>
 
       <main className="dashboard">
         <section className="hero">
           <div>
-            <p className="eyebrow">ADMIN CONSOLE</p>
-            <h2>Question Management</h2>
-            <p className="hero-copy">Create and manage coding questions for the verification system.</p>
+            <p className="eyebrow">{user.role}</p>
+            <h2>Welcome, {user.name}</h2>
+            <p className="hero-copy">
+              {isStudent
+                ? "Take coding assessments and use the coding platform."
+                : isRecruiter
+                  ? "Manage assessments and review behavior tracking and authenticity analysis."
+                  : "Manage the VeriCode platform and its users."}
+            </p>
           </div>
           <div className="stat-card">
-            <span>Total questions</span>
-            <strong>{questions.length}</strong>
+            <span>Account role</span>
+            <strong>{user.role}</strong>
           </div>
         </section>
 
-        {(message || error) && (
-          <div className={`alert ${message ? "success" : "error"}`}>
-            {message || error}
-          </div>
-        )}
-
-        <div className="content-grid">
-          <section className="panel form-panel">
-            <div className="panel-heading">
-              <div>
-                <p className="section-label">{editingQuestionId ? "EDIT QUESTION" : "NEW QUESTION"}</p>
-                <h3>{editingQuestionId ? "Update question" : "Create question"}</h3>
-              </div>
-              {editingQuestionId && (
-                <button className="text-button" type="button" onClick={resetQuestionForm}>Cancel</button>
-              )}
-            </div>
-
-            <form onSubmit={handleQuestionSubmit}>
-              <label>
-                Question title
-                <input name="title" value={questionForm.title} onChange={handleQuestionChange} placeholder="e.g. Two Sum" required />
-              </label>
-              <label>
-                Problem description
-                <textarea name="description" value={questionForm.description} onChange={handleQuestionChange} placeholder="Describe the problem" rows="4" required />
-              </label>
-              <label>
-                Input description
-                <textarea name="inputDescription" value={questionForm.inputDescription} onChange={handleQuestionChange} placeholder="Describe the input" rows="3" required />
-              </label>
-              <label>
-                Output description
-                <textarea name="outputDescription" value={questionForm.outputDescription} onChange={handleQuestionChange} placeholder="Describe the output" rows="3" required />
-              </label>
-              <label>
-                Constraints
-                <textarea name="constraints" value={questionForm.constraints} onChange={handleQuestionChange} placeholder="Enter constraints" rows="3" required />
-              </label>
-              <label>
-                Time limit (seconds)
-                <input type="number" min="1" name="timeLimitSeconds" value={questionForm.timeLimitSeconds} onChange={handleQuestionChange} required />
-              </label>
-              <label>
-                Language
-                <select name="language" value={questionForm.language} onChange={handleQuestionChange}>
-                  <option value="JAVA">Java</option>
-                </select>
-              </label>
-              <button className="primary-button" type="submit" disabled={savingQuestion}>
-                {savingQuestion ? "Saving..." : editingQuestionId ? "Update question" : "Create question"}
-              </button>
-            </form>
-          </section>
-
-          <section className="panel table-panel">
-            <div className="panel-heading">
-              <div>
-                <p className="section-label">QUESTION BANK</p>
-                <h3>Coding questions</h3>
-              </div>
-              <button className="refresh-button" type="button" onClick={loadQuestions}>Refresh</button>
-            </div>
-
-            {loadingQuestions ? (
-              <div className="empty-state">Loading questions...</div>
-            ) : questions.length === 0 ? (
-              <div className="empty-state">
-                <strong>No questions yet</strong>
-                <span>Create the first coding question using the form.</span>
-              </div>
-            ) : (
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr><th>ID</th><th>Question</th><th>Language</th><th>Time</th><th>Actions</th></tr>
-                  </thead>
-                  <tbody>
-                    {questions.map((question) => (
-                      <tr key={question.id}>
-                        <td><span className="id-badge">#{question.id}</span></td>
-                        <td className="candidate-name">{question.title}</td>
-                        <td>{question.language}</td>
-                        <td>{question.timeLimitSeconds}s</td>
-                        <td>
-                          <div className="actions">
-                            <button className="action-button edit" type="button" onClick={() => handleEditQuestion(question)}>Edit</button>
-                            <button className="action-button delete" type="button" onClick={() => handleDeleteQuestion(question.id)}>Delete</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        </div>
-
-        <section className="panel table-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="section-label">CANDIDATE DIRECTORY</p>
-              <h3>Candidates</h3>
-            </div>
-            <div className="actions">
-              <span>{candidates.length} candidate{candidates.length === 1 ? "" : "s"}</span>
-              <button className="refresh-button" type="button" onClick={loadCandidates}>Refresh</button>
-            </div>
-          </div>
-
-          {loadingCandidates ? (
-            <div className="empty-state">Loading candidates...</div>
-          ) : candidates.length === 0 ? (
-            <div className="empty-state">No candidates yet.</div>
-          ) : (
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>ID</th><th>Candidate</th><th>Email</th><th>Actions</th></tr></thead>
-                <tbody>
-                  {candidates.map((candidate) => (
-                    <tr key={candidate.id}>
-                      <td><span className="id-badge">#{candidate.id}</span></td>
-                      <td className="candidate-name">{candidate.name}</td>
-                      <td>{candidate.email}</td>
-                      <td>
-                        <div className="actions">
-                          <button className="action-button edit" type="button" onClick={() => handleEditCandidate(candidate)}>Edit</button>
-                          <button className="action-button delete" type="button" onClick={() => handleDeleteCandidate(candidate.id)}>Delete</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        <div className="dashboard-cards">
+          {isStudent && (
+            <>
+              <FeatureCard title="My Assessments" text="View coding assessments assigned to you." />
+              <FeatureCard title="Coding Platform" text="Open an assessment and write your solution." />
+            </>
           )}
-        </section>
+
+          {isRecruiter && (
+            <>
+              <FeatureCard title="Assessments" text="Create and manage coding assessments." />
+              <FeatureCard title="Candidates" text="View candidates and assessment submissions." />
+              <FeatureCard title="Behavior Tracking" text="Review coding-session behavior signals." />
+              <FeatureCard title="Authenticity Analysis" text="Review authenticity scores, risk levels, and evidence." />
+            </>
+          )}
+
+          {!isStudent && !isRecruiter && (
+            <>
+              <FeatureCard title="Manage Users" text="Manage platform accounts and access." />
+              <FeatureCard title="Manage Recruiters & Institutes" text="Manage organizations using VeriCode." />
+              <FeatureCard title="Manage Students" text="Manage student accounts." />
+              <FeatureCard title="Manage Questions" text="Manage the coding question bank." />
+              <FeatureCard title="Manage Assessments" text="Manage platform-wide assessments." />
+              <FeatureCard title="System-wide Activity" text="Review system activity and analysis." />
+              <FeatureCard title="Roles & Permissions" text="Control role-based access." />
+              <FeatureCard title="System Controls" text="Manage system-level settings." />
+            </>
+          )}
+        </div>
       </main>
     </div>
+  );
+}
+
+function FeatureCard({ title, text }) {
+  return (
+    <section className="panel feature-card">
+      <p className="section-label">VERICODE</p>
+      <h3>{title}</h3>
+      <p>{text}</p>
+    </section>
   );
 }
 
