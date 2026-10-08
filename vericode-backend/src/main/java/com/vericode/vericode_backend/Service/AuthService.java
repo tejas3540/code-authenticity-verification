@@ -56,6 +56,12 @@ public class AuthService {
         return toResponse(user);
     }
 
+    public AuthResponseDTO getById(Integer id) {
+        UserAccount user = userAccountRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("User account not found"));
+        return toResponse(user);
+    }
+
     private void ensureEmailAvailable(String email) {
         if (userAccountRepository.findByEmail(email).isPresent()) {
             throw new IllegalArgumentException("Email is already registered");
