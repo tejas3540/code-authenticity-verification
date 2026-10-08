@@ -4,16 +4,20 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
 public class CandidateRequestDTO {
+
     @NotBlank(message = "Enter Name")
     private String name;
-    @NotBlank(message="Enter email")
-    @Email(message= "Invalid email")
+
+    @NotBlank(message = "Enter email")
+    @Email(message = "Invalid email")
     private String email;
 
-    public CandidateRequestDTO() {}
-    public CandidateRequestDTO(Integer id, String name, String email) {
-        this.name=name;
-        this.email=email;
+    public CandidateRequestDTO() {
+    }
+
+    public CandidateRequestDTO(String name, String email) {
+        this.name = name;
+        this.email = email;
     }
 
     public String getEmail() {
