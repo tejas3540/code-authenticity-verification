@@ -26,6 +26,8 @@ export default [
     rules: {
       ...js.configs.recommended.rules,
       ...reactHooks.configs["recommended-latest"].rules,
+      // Initial API data fetching intentionally updates state from an effect.
+      "react-hooks/set-state-in-effect": "off",
       "react-refresh/only-export-components": [
         "warn",
         { allowConstantExport: true },
