@@ -568,7 +568,7 @@ function AssessmentManager({ onClose }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title, description, durationMinutes: Number(durationMinutes), questionIds,
-          studentEmails: studentEmails.split(/[;,\\n]/).map((email) => email.trim()).filter(Boolean),
+          studentEmails: studentEmails.split(/[;,\n]/).map((email) => email.trim()).filter(Boolean),
         }),
       });
       const data = response.status === 204 ? null : await response.json();
