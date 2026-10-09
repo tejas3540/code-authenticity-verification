@@ -342,6 +342,7 @@ function QuestionManager({ onClose }) {
   const [questions, setQuestions] = useState([]);
   const [form, setForm] = useState(emptyQuestion);
   const [editingId, setEditingId] = useState(null);
+  const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -373,6 +374,7 @@ function QuestionManager({ onClose }) {
   const resetForm = () => {
     setForm(emptyQuestion);
     setEditingId(null);
+    setShowForm(false);
   };
 
   const handleSubmit = async (event) => {
@@ -409,6 +411,7 @@ function QuestionManager({ onClose }) {
 
   const editQuestion = (question) => {
     setEditingId(question.id);
+    setShowForm(true);
     setForm({
       title: question.title,
       description: question.description,
@@ -439,12 +442,16 @@ function QuestionManager({ onClose }) {
       <div className="panel-heading">
         <div>
           <p className="section-label">RECRUITER QUESTION BANK</p>
-          <h3>{editingId ? "Edit coding question" : "Add coding question"}</h3>
+          <h3>{showForm ? (editingId ? "Edit coding question" : "Add coding question") : "Manage coding questions"}</h3>
         </div>
-        <button className="text-button" type="button" onClick={onClose}>Close</button>
+        <div className="actions">
+          {!showForm && <button className="primary-button" type="button" onClick={() => { resetForm(); setShowForm(true); }}>+ Add Question</button>}
+          {showForm && <button className="text-button" type="button" onClick={resetForm}>Back to questions</button>}
+          <button className="text-button" type="button" onClick={onClose}>Close</button>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      {showForm && <form onSubmit={handleSubmit}>
         <label>
           Question title
           <input name="title" value={form.title} onChange={handleChange} placeholder="e.g. Two Sum" required />
@@ -483,12 +490,12 @@ function QuestionManager({ onClose }) {
             <button className="text-button" type="button" onClick={resetForm}>Cancel edit</button>
           )}
         </div>
-      </form>
+      </form>}
 
       {message && <div className="alert success">{message}</div>}
       {error && <div className="alert error">{error}</div>}
 
-      <div className="question-list">
+      {!showForm && <div className="question-list">
         <div className="panel-heading">
           <div>
             <p className="section-label">QUESTION BANK</p>
@@ -535,7 +542,7 @@ function QuestionManager({ onClose }) {
             </table>
           </div>
         )}
-      </div>
+      </div>}
     </section>
   );
 }
