@@ -72,7 +72,13 @@ public class AssessmentService {
         } else {
             assessments = assessmentRepository.findAll();
         }
-        return assessments.stream().map(this::toResponse).toList();
+        return assessments.stream().map(assessment -> {
+            AssessmentResponseDTO response = toResponse(assessment);
+            if ("STUDENT".equals(role)) {
+                response.setStudentEmails(List.of());
+            }
+            return response;
+        }).toList();
     }
 
     private AssessmentResponseDTO toResponse(Assessment assessment) {
