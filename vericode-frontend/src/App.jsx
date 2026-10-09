@@ -236,9 +236,7 @@ function FeatureCard({ title, text, action, onAction }) {
 function Dashboard({ user, onLogout }) {
   const isStudent = user.role === "STUDENT";
   const isRecruiter = user.role === "RECRUITER";
-  const [showQuestionManager, setShowQuestionManager] = useState(false);
-  const [showAssessmentManager, setShowAssessmentManager] = useState(false);
-  const [showStudentAssessments, setShowStudentAssessments] = useState(false);
+  const [view, setView] = useState("dashboard");
 
   return (
     <div className="dashboard-shell">
@@ -275,20 +273,20 @@ function Dashboard({ user, onLogout }) {
         <div className="dashboard-cards">
           {isStudent && (
             <>
-              <FeatureCard title="My Assessments" text="View assessments assigned to your account and open their questions." action="View Assessments" onAction={() => setShowStudentAssessments(true)} />
+              <FeatureCard title="My Assessments" text="View assessments assigned to your account and open their questions." action="View Assessments" onAction={() => setView("studentAssessments")} />
               <FeatureCard title="Coding Platform" text="Open an assigned assessment, write Java code, and submit your solution." action="Open Coding Platform" onAction={() => setShowStudentAssessments(true)} />
             </>
           )}
 
           {isRecruiter && (
             <>
-              <FeatureCard title="Assessments" text="Create assessments, choose questions, and assign them to registered students by email." action="Create Assessment" onAction={() => setShowAssessmentManager(true)} />
+              <FeatureCard title="Assessments" text="Create assessments, choose questions, and assign them to registered students by email." action="Create Assessment" onAction={() => setView("assessmentManager")} />
               <FeatureCard title="Candidates" text="View candidates and assessment submissions." />
               <FeatureCard
                 title="Manage Questions"
                 text="Create, edit, and delete coding questions for your assessments."
                 action="Open Question Manager"
-                onAction={() => setShowQuestionManager(true)}
+                onAction={() => setView("questionManager")}
               />
               <FeatureCard title="Behavior Tracking" text="Review coding-session behavior signals." />
               <FeatureCard title="Authenticity Analysis" text="Review authenticity scores, risk levels, and evidence." />
@@ -309,14 +307,21 @@ function Dashboard({ user, onLogout }) {
           )}
         </div>
 
-        {isRecruiter && showAssessmentManager && (
-          <AssessmentManager onClose={() => setShowAssessmentManager(false)} />
-        )}
-        {isRecruiter && showQuestionManager && (
-          <QuestionManager onClose={() => setShowQuestionManager(false)} />
-        )}
-        {isStudent && showStudentAssessments && (
-          <StudentAssessmentPlatform onClose={() => setShowStudentAssessments(false)} />
+        {view !== "dashboard" && (
+          <div className="page-view">
+            <button className="back-link" type="button" onClick={() => setView("dashboard")}>
+              ← Back to dashboard
+            </button>
+            {isRecruiter && view === "assessmentManager" && (
+              <AssessmentManager onClose={() => setView("dashboard")} />
+            )}
+            {isRecruiter && view === "questionManager" && (
+              <QuestionManager onClose={() => setView("dashboard")} />
+            )}
+            {isStudent && view === "studentAssessments" && (
+              <StudentAssessmentPlatform onClose={() => setView("dashboard")} />
+            )}
+          </div>
         )}
       </main>
     </div>
@@ -497,7 +502,7 @@ function QuestionManager({ onClose }) {
         ) : questions.length === 0 ? (
           <div className="empty-state">
             <strong>No questions yet</strong>
-            <span>Add the first coding question above.</span>
+            <span>Use the Add Question action to create your first problem.</span>
           </div>
         ) : (
           <div className="table-wrap">
@@ -629,7 +634,7 @@ function StudentAssessmentPlatform({ onClose }) {
         <div className="assessment-list">{assessments.map((assessment) => (
           <article className="assessment-item" key={assessment.id}>
             <div><h4>{assessment.title}</h4><p>{assessment.description || "Coding assessment"}</p><small>{assessment.questions.length} question(s) · {assessment.durationMinutes} minutes · Created by {assessment.recruiterName}</small></div>
-            <button className="primary-button" type="button" onClick={() => { setSelected(assessment); setNotice(""); }}>Open assessment</button>
+            <button className="primary-button" type="button" onClick={() => { setSelected(assessment); setNotice(""); }}>Start Assessment</button>
           </article>
         ))}</div>
       ) : (
