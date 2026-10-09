@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 
 const AUTH_API = "http://localhost:8080/Auth";
@@ -281,15 +281,15 @@ function Dashboard({ user, onLogout }) {
           {isRecruiter && (
             <>
               <FeatureCard title="Assessments" text="Create assessments, choose questions, and assign them to registered students by email." action="Create Assessment" onAction={() => setView("assessmentManager")} />
-              <FeatureCard title="Candidates" text="View candidates and assessment submissions." />
+              <FeatureCard title="Candidates" text="View candidates and assessment assignments." />
+              <FeatureCard title="Submissions" text="Review submitted code, coding activity, and authenticity evidence for each submission." action="Review Submissions" onAction={() => setView("submissions")} />
               <FeatureCard
                 title="Manage Questions"
                 text="Create, edit, and delete coding questions for your assessments."
                 action="Open Question Manager"
                 onAction={() => setView("questionManager")}
               />
-              <FeatureCard title="Behavior Tracking" text="Review coding-session behavior signals." />
-              <FeatureCard title="Authenticity Analysis" text="Review authenticity scores, risk levels, and evidence." />
+
             </>
           )}
 
@@ -318,6 +318,9 @@ function Dashboard({ user, onLogout }) {
             )}
             {isRecruiter && view === "questionManager" && (
               <QuestionManager onClose={() => setView("dashboard")} />
+            )}
+            {isRecruiter && view === "submissions" && (
+              <SubmissionsReview onClose={() => setView("dashboard")} />
             )}
             {isStudent && view === "studentAssessments" && (
               <StudentAssessmentPlatform onClose={() => setView("dashboard")} />
@@ -613,6 +616,89 @@ function AssessmentManager({ onClose }) {
   );
 }
 
+function SubmissionsReview({ onClose }) {
+  const [submissions, setSubmissions] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadSubmissions = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(`${SUBMISSION_API}/recruiter`, { credentials: "include" });
+      if (!response.ok) {
+        throw new Error(response.status === 401 ? "Your session expired. Please log in again." : "Unable to load submissions.");
+      }
+      setSubmissions(await response.json());
+    } catch (e) {
+      setError(e.message || "Unable to load submissions.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadSubmissions(); }, [loadSubmissions]);
+
+  return (
+    <section className="panel question-manager">
+      <div className="panel-heading">
+        <div>
+          <p className="section-label">RECRUITER REVIEW</p>
+          <h3>{selected ? `Submission #${selected.id}` : "Student submissions"}</h3>
+        </div>
+        <div className="actions">
+          <button className="text-button" type="button" onClick={loadSubmissions}>Refresh</button>
+          <button className="text-button" type="button" onClick={() => selected ? setSelected(null) : onClose()}>{selected ? "Back to submissions" : "Close"}</button>
+        </div>
+      </div>
+      {error && <div className="alert error">{error}</div>}
+      {loading ? <div className="empty-state">Loading submissions...</div> : selected ? (
+        <div className="submission-detail">
+          <div className="submission-summary-grid">
+            <div><span>Student</span><strong>{selected.studentName}</strong><small>{selected.studentEmail}</small></div>
+            <div><span>Assessment</span><strong>{selected.assessmentTitle}</strong></div>
+            <div><span>Question</span><strong>{selected.questionTitle}</strong></div>
+            <div><span>Submitted</span><strong>{new Date(selected.submittedAt).toLocaleString()}</strong></div>
+          </div>
+          <div className="panel-heading"><div><p className="section-label">SOURCE CODE</p><h3>Submitted solution</h3></div></div>
+          <pre className="submission-code">{selected.sourceCode}</pre>
+          <div className="panel-heading"><div><p className="section-label">BEHAVIOR EVIDENCE</p><h3>Coding session summary</h3></div></div>
+          <div className="submission-summary-grid">
+            <div><span>Source lines</span><strong>{selected.sourceLines}</strong></div>
+            <div><span>Characters</span><strong>{selected.sourceCharacters}</strong></div>
+            <div><span>Paste events</span><strong>{selected.eventCounts?.paste || 0}</strong></div>
+            <div><span>Focus/visibility changes</span><strong>{(selected.eventCounts?.window_blur || 0) + (selected.eventCounts?.visibility_hidden || 0)}</strong></div>
+            <div><span>Identical normalized-code matches</span><strong>{selected.identicalCodeMatches}</strong></div>
+            <div><span>Evidence status</span><strong>{selected.analysisStatus === "READY_FOR_REVIEW" ? "Ready for review" : "Limited evidence"}</strong></div>
+          </div>
+          <h4>Review indicators</h4>
+          <ul className="review-indicators">{(selected.reviewIndicators || []).map((indicator, index) => <li key={index}>{indicator}</li>)}</ul>
+          <p className="editor-note">{selected.analysisNotice}</p>
+          <h4>Coding activity timeline</h4>
+          {(selected.behaviorEvents || []).length === 0 ? <div className="empty-state">No behavior events were recorded for this submission.</div> : (
+            <div className="table-wrap"><table><thead><tr><th>Time</th><th>Event</th><th>Details</th></tr></thead><tbody>
+              {selected.behaviorEvents.map((event, index) => <tr key={index}><td>{event.occurredAt ? new Date(event.occurredAt).toLocaleString() : "—"}</td><td>{event.eventType || "unknown"}</td><td>{event.details || "—"}</td></tr>)}
+            </tbody></table></div>
+          )}
+        </div>
+      ) : submissions.length === 0 ? (
+        <div className="empty-state"><strong>No submissions yet</strong><span>Submitted student solutions will appear here with their captured behavior events.</span></div>
+      ) : (
+        <div className="table-wrap"><table><thead><tr><th>Student</th><th>Assessment</th><th>Question</th><th>Submitted at</th><th>Evidence</th><th></th></tr></thead><tbody>
+          {submissions.map((submission) => <tr key={submission.id}>
+            <td><strong>{submission.studentName}</strong><br /><small>{submission.studentEmail}</small></td>
+            <td>{submission.assessmentTitle}</td><td>{submission.questionTitle}</td>
+            <td>{new Date(submission.submittedAt).toLocaleString()}</td>
+            <td>{submission.analysisStatus === "READY_FOR_REVIEW" ? "Ready for review" : "Limited evidence"}</td>
+            <td><button className="action-button edit" type="button" onClick={() => setSelected(submission)}>View report</button></td>
+          </tr>)}
+        </tbody></table></div>
+      )}
+    </section>
+  );
+}
+
 function StudentAssessmentPlatform({ onClose }) {
   const [assessments, setAssessments] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -659,14 +745,46 @@ function CodeQuestion({ assessmentId, question, onSubmitted }) {
   const [code, setCode] = useState("public class Main {\n    public static void main(String[] args) {\n        // Write your solution here\n    }\n}");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [behaviorEvents, setBehaviorEvents] = useState([]);
+  const startedAt = useRef(Date.now());
+
+  const recordEvent = (eventType, details = "") => {
+    setBehaviorEvents((events) => [...events, {
+      eventType,
+      occurredAt: new Date().toISOString(),
+      details,
+    }].slice(-500));
+  };
+
+  useEffect(() => {
+    const onBlur = () => recordEvent("window_blur", "Assessment window lost focus");
+    const onFocus = () => recordEvent("window_focus", "Assessment window regained focus");
+    const onVisibility = () => recordEvent(
+      document.visibilityState === "hidden" ? "visibility_hidden" : "visibility_visible",
+      `Document visibility: ${document.visibilityState}`
+    );
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   const submit = async () => {
     setSaving(true); setError("");
+    const submittedEvents = [...behaviorEvents, {
+      eventType: "submit",
+      occurredAt: new Date().toISOString(),
+      details: `Submitted after approximately ${Math.max(0, Math.round((Date.now() - startedAt.current) / 1000))} seconds in this question view`,
+    }];
     try {
       const response = await fetch(SUBMISSION_API, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assessmentId, questionId: question.id, sourceCode: code }),
+        body: JSON.stringify({ assessmentId, questionId: question.id, sourceCode: code, behaviorEvents: submittedEvents }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Submission failed.");
@@ -679,10 +797,11 @@ function CodeQuestion({ assessmentId, question, onSubmitted }) {
     <article className="code-question">
       <h4>{question.title}</h4><p>{question.description}</p>
       <p><strong>Input:</strong> {question.inputDescription}</p><p><strong>Output:</strong> {question.outputDescription}</p><p><strong>Constraints:</strong> {question.constraints}</p>
-      <label>Java solution<textarea className="code-editor" spellCheck="false" value={code} onChange={(e) => setCode(e.target.value)} rows="14" /></label>
+      <label>Java solution<textarea className="code-editor" spellCheck="false" value={code} onPaste={() => recordEvent("paste", "Paste event in code editor")} onChange={(e) => { setCode(e.target.value); recordEvent("code_edit", `Editor changed; ${e.target.value.length} characters`); }} rows="14" /></label>
+      <p className="editor-note">Behavior tracking records editor changes, paste events, and page focus/visibility changes during this question view.</p>
       <button className="primary-button" type="button" disabled={saving || !code.trim()} onClick={submit}>{saving ? "Submitting..." : "Submit solution"}</button>
       {error && <div className="alert error">{error}</div>}
-      <p className="editor-note">Submissions are saved. Code execution and automated test-case evaluation are not implemented yet.</p>
+      <p className="editor-note">Submissions and captured behavior events are saved. Code execution and automated test-case evaluation are not implemented yet.</p>
     </article>
   );
 }
