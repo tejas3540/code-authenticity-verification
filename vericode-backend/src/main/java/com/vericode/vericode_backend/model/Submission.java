@@ -16,6 +16,8 @@ public class Submission {
     private UserAccount student;
     @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String sourceCode;
+    @Column(columnDefinition = "LONGTEXT")
+    private String behaviorEventsJson;
     @Column(nullable = false)
     private LocalDateTime submittedAt;
 
@@ -26,9 +28,11 @@ public class Submission {
     public Question getQuestion() { return question; }
     public UserAccount getStudent() { return student; }
     public String getSourceCode() { return sourceCode; }
+    public String getBehaviorEventsJson() { return behaviorEventsJson; }
     public LocalDateTime getSubmittedAt() { return submittedAt; }
     public void setAssessment(Assessment assessment) { this.assessment = assessment; }
     public void setQuestion(Question question) { this.question = question; }
     public void setStudent(UserAccount student) { this.student = student; }
     public void setSourceCode(String sourceCode) { this.sourceCode = sourceCode; }
+    public void setBehaviorEventsJson(String behaviorEventsJson) { this.behaviorEventsJson = behaviorEventsJson; }
 }
