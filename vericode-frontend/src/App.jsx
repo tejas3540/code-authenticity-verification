@@ -136,7 +136,7 @@ function App() {
           <h2>{isStudent ? "Student account" : role === "RECRUITER" ? "Recruiter account" : "Administrator account"}</h2>
           <p>
             {isStudent
-              ? "Access assigned coding assessments and the coding platform."
+              ? "View your assigned assessments and start each assessment when it is available."
               : role === "RECRUITER"
                 ? "Manage assessments and review coding behavior and authenticity analysis."
                 : "Manage users, assessments, permissions, and system controls."}
@@ -259,7 +259,7 @@ function Dashboard({ user, onLogout }) {
             <h2>Welcome, {user.name}</h2>
             <p className="hero-copy">
               {isStudent
-                ? "Take coding assessments and use the coding platform."
+                ? "View your assigned assessments and open the coding workspace from Start Assessment."
                 : isRecruiter
                   ? "Manage assessments and review behavior tracking and authenticity analysis."
                   : "Manage the VeriCode platform and its users."}
@@ -275,7 +275,6 @@ function Dashboard({ user, onLogout }) {
           {isStudent && (
             <>
               <FeatureCard title="My Assessments" text="View assessments assigned to your account and open their questions." action="View Assessments" onAction={() => setView("studentAssessments")} />
-              <FeatureCard title="Coding Platform" text="Open an assigned assessment, write Java code, and submit your solution." action="Open Coding Platform" onAction={() => setView("studentAssessments")} />
             </>
           )}
 
@@ -635,7 +634,7 @@ function StudentAssessmentPlatform({ onClose }) {
 
   return (
     <section className="panel question-manager">
-      <div className="panel-heading"><div><p className="section-label">STUDENT CODING PLATFORM</p><h3>{selected ? selected.title : "My assigned assessments"}</h3></div><button className="text-button" type="button" onClick={() => selected ? setSelected(null) : onClose()}>{selected ? "Back to assessments" : "Close"}</button></div>
+      <div className="panel-heading"><div><p className="section-label">STUDENT ASSESSMENTS</p><h3>{selected ? selected.title : "My assigned assessments"}</h3></div><button className="text-button" type="button" onClick={() => selected ? setSelected(null) : onClose()}>{selected ? "Back to assessments" : "Close"}</button></div>
       {error && <div className="alert error">{error}</div>}
       {notice && <div className="alert success">{notice}</div>}
       {loading ? <p>Loading assessments...</p> : !selected ? (
