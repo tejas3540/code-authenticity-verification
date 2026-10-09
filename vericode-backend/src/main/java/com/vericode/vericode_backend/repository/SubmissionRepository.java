@@ -7,4 +7,5 @@ import java.util.List;
 public interface SubmissionRepository extends JpaRepository<Submission, Integer> {
     List<Submission> findByStudent_Id(Integer studentId);
     List<Submission> findByAssessment_Id(Integer assessmentId);
+    List<Submission> findByAssessment_Recruiter_IdOrderBySubmittedAtDesc(Integer recruiterId);
 }
