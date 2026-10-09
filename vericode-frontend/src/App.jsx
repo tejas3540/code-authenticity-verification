@@ -3,6 +3,8 @@ import "./App.css";
 
 const AUTH_API = "http://localhost:8080/Auth";
 const QUESTION_API = "http://localhost:8080/Questions";
+const ASSESSMENT_API = "http://localhost:8080/Assessments";
+const SUBMISSION_API = "http://localhost:8080/Submissions";
 
 const emptyStudent = {
   name: "",
@@ -235,6 +237,8 @@ function Dashboard({ user, onLogout }) {
   const isStudent = user.role === "STUDENT";
   const isRecruiter = user.role === "RECRUITER";
   const [showQuestionManager, setShowQuestionManager] = useState(false);
+  const [showAssessmentManager, setShowAssessmentManager] = useState(false);
+  const [showStudentAssessments, setShowStudentAssessments] = useState(false);
 
   return (
     <div className="dashboard-shell">
@@ -271,14 +275,14 @@ function Dashboard({ user, onLogout }) {
         <div className="dashboard-cards">
           {isStudent && (
             <>
-              <FeatureCard title="My Assessments" text="View coding assessments assigned to you." />
-              <FeatureCard title="Coding Platform" text="Open an assessment and write your solution." />
+              <FeatureCard title="My Assessments" text="View assessments assigned to your account and open their questions." action="View Assessments" onAction={() => setShowStudentAssessments(true)} />
+              <FeatureCard title="Coding Platform" text="Open an assigned assessment, write Java code, and submit your solution." action="Open Coding Platform" onAction={() => setShowStudentAssessments(true)} />
             </>
           )}
 
           {isRecruiter && (
             <>
-              <FeatureCard title="Assessments" text="Create and manage coding assessments." />
+              <FeatureCard title="Assessments" text="Create assessments, choose questions, and assign them to registered students by email." action="Create Assessment" onAction={() => setShowAssessmentManager(true)} />
               <FeatureCard title="Candidates" text="View candidates and assessment submissions." />
               <FeatureCard
                 title="Manage Questions"
@@ -305,8 +309,14 @@ function Dashboard({ user, onLogout }) {
           )}
         </div>
 
+        {isRecruiter && showAssessmentManager && (
+          <AssessmentManager onClose={() => setShowAssessmentManager(false)} />
+        )}
         {isRecruiter && showQuestionManager && (
           <QuestionManager onClose={() => setShowQuestionManager(false)} />
+        )}
+        {isStudent && showStudentAssessments && (
+          <StudentAssessmentPlatform onClose={() => setShowStudentAssessments(false)} />
         )}
       </main>
     </div>
@@ -522,6 +532,145 @@ function QuestionManager({ onClose }) {
         )}
       </div>
     </section>
+  );
+}
+
+
+function AssessmentManager({ onClose }) {
+  const [questions, setQuestions] = useState([]);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState(60);
+  const [studentEmails, setStudentEmails] = useState("");
+  const [questionIds, setQuestionIds] = useState([]);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch(QUESTION_API)
+      .then((r) => { if (!r.ok) throw new Error("Could not load questions."); return r.json(); })
+      .then(setQuestions)
+      .catch((e) => setError(e.message));
+  }, []);
+
+  const toggleQuestion = (id) => setQuestionIds((old) =>
+    old.includes(id) ? old.filter((item) => item !== id) : [...old, id]
+  );
+
+  const createAssessment = async (event) => {
+    event.preventDefault();
+    setSaving(true); setError(""); setMessage("");
+    try {
+      const response = await fetch(ASSESSMENT_API, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title, description, durationMinutes: Number(durationMinutes), questionIds,
+          studentEmails: studentEmails.split(/[;,\\n]/).map((email) => email.trim()).filter(Boolean),
+        }),
+      });
+      const data = response.status === 204 ? null : await response.json();
+      if (!response.ok) throw new Error(data?.message || "Assessment creation failed. Check student emails and selected questions.");
+      setMessage(`Assessment "${data.title}" created and assigned to ${data.studentEmails.length} student(s).`);
+      setTitle(""); setDescription(""); setDurationMinutes(60); setStudentEmails(""); setQuestionIds([]);
+    } catch (e) { setError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <section className="panel question-manager">
+      <div className="panel-heading"><div><p className="section-label">ASSESSMENT BUILDER</p><h3>Create and assign assessment</h3></div><button className="text-button" type="button" onClick={onClose}>Close</button></div>
+      <form onSubmit={createAssessment}>
+        <label>Assessment title<input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="e.g. Java Fundamentals Test" /></label>
+        <label>Description<textarea value={description} onChange={(e) => setDescription(e.target.value)} rows="3" /></label>
+        <label>Duration (minutes)<input type="number" min="1" value={durationMinutes} onChange={(e) => setDurationMinutes(e.target.value)} required /></label>
+        <label>Student email addresses<textarea value={studentEmails} onChange={(e) => setStudentEmails(e.target.value)} rows="3" required placeholder="student1@example.com, student2@example.com" /><span>Enter registered student emails separated by commas or new lines.</span></label>
+        <div><p><strong>Select questions</strong></p>
+          {questions.length === 0 ? <p className="empty-state">No questions available. Add questions in Manage Questions first.</p> : questions.map((q) => (
+            <label key={q.id} className="question-choice"><input type="checkbox" checked={questionIds.includes(q.id)} onChange={() => toggleQuestion(q.id)} /><span><strong>{q.title}</strong><small>{q.language} · {q.timeLimitSeconds}s</small></span></label>
+          ))}
+        </div>
+        <button className="primary-button" type="submit" disabled={saving || questions.length === 0 || questionIds.length === 0}>{saving ? "Creating..." : "Create and assign assessment"}</button>
+      </form>
+      {message && <div className="alert success">{message}</div>}
+      {error && <div className="alert error">{error}</div>}
+    </section>
+  );
+}
+
+function StudentAssessmentPlatform({ onClose }) {
+  const [assessments, setAssessments] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true); setError("");
+    try {
+      const response = await fetch(`${ASSESSMENT_API}/my`, { credentials: "include" });
+      if (!response.ok) throw new Error(response.status === 401 ? "Your session expired. Please log in again." : "Could not load assigned assessments.");
+      setAssessments(await response.json());
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <section className="panel question-manager">
+      <div className="panel-heading"><div><p className="section-label">STUDENT CODING PLATFORM</p><h3>{selected ? selected.title : "My assigned assessments"}</h3></div><button className="text-button" type="button" onClick={() => selected ? setSelected(null) : onClose()}>{selected ? "Back to assessments" : "Close"}</button></div>
+      {error && <div className="alert error">{error}</div>}
+      {notice && <div className="alert success">{notice}</div>}
+      {loading ? <p>Loading assessments...</p> : !selected ? (
+        assessments.length === 0 ? <div className="empty-state"><strong>No assessments assigned yet</strong><span>Your recruiter must create an assessment and assign it to your registered email address.</span></div> :
+        <div className="assessment-list">{assessments.map((assessment) => (
+          <article className="assessment-item" key={assessment.id}>
+            <div><h4>{assessment.title}</h4><p>{assessment.description || "Coding assessment"}</p><small>{assessment.questions.length} question(s) · {assessment.durationMinutes} minutes · Created by {assessment.recruiterName}</small></div>
+            <button className="primary-button" type="button" onClick={() => { setSelected(assessment); setNotice(""); }}>Open assessment</button>
+          </article>
+        ))}</div>
+      ) : (
+        <div className="coding-workspace">
+          <p>{selected.description}</p><p><strong>Duration:</strong> {selected.durationMinutes} minutes · <strong>Language:</strong> Java</p>
+          {selected.questions.map((question) => <CodeQuestion key={question.id} assessmentId={selected.id} question={question} onSubmitted={(text) => setNotice(text)} />)}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CodeQuestion({ assessmentId, question, onSubmitted }) {
+  const [code, setCode] = useState("public class Main {\n    public static void main(String[] args) {\n        // Write your solution here\n    }\n}");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    setSaving(true); setError("");
+    try {
+      const response = await fetch(SUBMISSION_API, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assessmentId, questionId: question.id, sourceCode: code }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Submission failed.");
+      onSubmitted(`Submitted "${question.title}" successfully at ${new Date(data.submittedAt).toLocaleString()}.`);
+    } catch (e) { setError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <article className="code-question">
+      <h4>{question.title}</h4><p>{question.description}</p>
+      <p><strong>Input:</strong> {question.inputDescription}</p><p><strong>Output:</strong> {question.outputDescription}</p><p><strong>Constraints:</strong> {question.constraints}</p>
+      <label>Java solution<textarea className="code-editor" spellCheck="false" value={code} onChange={(e) => setCode(e.target.value)} rows="14" /></label>
+      <button className="primary-button" type="button" disabled={saving || !code.trim()} onClick={submit}>{saving ? "Submitting..." : "Submit solution"}</button>
+      {error && <div className="alert error">{error}</div>}
+      <p className="editor-note">Submissions are saved. Code execution and automated test-case evaluation are not implemented yet.</p>
+    </article>
   );
 }
 
