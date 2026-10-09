@@ -252,6 +252,7 @@ function Dashboard({ user, onLogout }) {
       </header>
 
       <main className="dashboard">
+        {view === "dashboard" && <>
         <section className="hero">
           <div>
             <p className="eyebrow">{user.role}</p>
@@ -274,7 +275,7 @@ function Dashboard({ user, onLogout }) {
           {isStudent && (
             <>
               <FeatureCard title="My Assessments" text="View assessments assigned to your account and open their questions." action="View Assessments" onAction={() => setView("studentAssessments")} />
-              <FeatureCard title="Coding Platform" text="Open an assigned assessment, write Java code, and submit your solution." action="Open Coding Platform" onAction={() => setShowStudentAssessments(true)} />
+              <FeatureCard title="Coding Platform" text="Open an assigned assessment, write Java code, and submit your solution." action="Open Coding Platform" onAction={() => setView("studentAssessments")} />
             </>
           )}
 
@@ -306,6 +307,7 @@ function Dashboard({ user, onLogout }) {
             </>
           )}
         </div>
+        </>}
 
         {view !== "dashboard" && (
           <div className="page-view">
