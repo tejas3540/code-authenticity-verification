@@ -1,7 +1,7 @@
 package com.vericode.vericode_backend.controller;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.vericode.vericode_backend.dto.SubmissionRequestDTO;
 import com.vericode.vericode_backend.model.*;
 import com.vericode.vericode_backend.repository.*;
