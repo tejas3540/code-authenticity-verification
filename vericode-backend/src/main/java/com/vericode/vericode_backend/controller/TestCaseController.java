@@ -3,19 +3,27 @@ package com.vericode.vericode_backend.controller;
 import com.vericode.vericode_backend.Service.TestCaseService;
 import com.vericode.vericode_backend.dto.TestCaseRequestDTO;
 import com.vericode.vericode_backend.dto.TestCaseResponseDTO;
+import com.vericode.vericode_backend.model.Assessment;
+import com.vericode.vericode_backend.model.Question;
+import com.vericode.vericode_backend.repository.AssessmentRepository;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @RestController
 @RequestMapping("/TestCases")
 public class TestCaseController {
     private final TestCaseService service;
+    private final AssessmentRepository assessmentRepository;
 
-    public TestCaseController(TestCaseService service) { this.service = service; }
+    public TestCaseController(TestCaseService service, AssessmentRepository assessmentRepository) {
+        this.service = service;
+        this.assessmentRepository = assessmentRepository;
+    }
 
     @PostMapping
     public ResponseEntity<?> create(@Valid @RequestBody TestCaseRequestDTO request, HttpSession session) {
@@ -26,9 +34,23 @@ public class TestCaseController {
     }
 
     @GetMapping("/question/{questionId}")
-    public ResponseEntity<List<TestCaseResponseDTO>> find(@PathVariable Integer questionId, HttpSession session) {
-        boolean student = "STUDENT".equals(session.getAttribute("role"));
-        return ResponseEntity.ok(service.findForQuestion(questionId, student));
+    public ResponseEntity<?> find(@PathVariable Integer questionId, HttpSession session) {
+        String role = (String) session.getAttribute("role");
+        Integer userId = (Integer) session.getAttribute("userId");
+        if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+
+        if ("STUDENT".equals(role)) {
+            boolean assigned = assessmentRepository.findDistinctByStudents_Id(userId).stream()
+                    .map(Assessment::getQuestions)
+                    .flatMap(List::stream)
+                    .map(Question::getId)
+                    .anyMatch(questionId::equals);
+            if (!assigned) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } else if (!"RECRUITER".equals(role)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        return ResponseEntity.ok(service.findForQuestion(questionId, "STUDENT".equals(role)));
     }
 
     @DeleteMapping("/{id}")
