@@ -3,8 +3,8 @@ package com.vericode.vericode_backend.controller;
 import com.vericode.vericode_backend.Service.QuestionService;
 import com.vericode.vericode_backend.dto.QuestionRequestDTO;
 import com.vericode.vericode_backend.dto.QuestionResponseDTO;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,36 +15,56 @@ import java.util.List;
 @RequestMapping("/Questions")
 public class QuestionController {
 
-    @Autowired
-    private QuestionService questionService;
+    private final QuestionService questionService;
+
+    public QuestionController(QuestionService questionService) {
+        this.questionService = questionService;
+    }
 
     @GetMapping
-    public ResponseEntity<List<QuestionResponseDTO>> getAllQuestions() {
+    public ResponseEntity<?> getAllQuestions(HttpSession session) {
+        if (session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         return ResponseEntity.ok(questionService.getAllQuestions());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<QuestionResponseDTO> getQuestion(@PathVariable Integer id) {
+    public ResponseEntity<?> getQuestion(@PathVariable Integer id, HttpSession session) {
+        if (session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         return ResponseEntity.ok(questionService.getQuestionById(id));
     }
 
     @PostMapping
-    public ResponseEntity<QuestionResponseDTO> save(
-            @Valid @RequestBody QuestionRequestDTO request) {
+    public ResponseEntity<?> save(
+            @Valid @RequestBody QuestionRequestDTO request,
+            HttpSession session) {
+        if (!"RECRUITER".equals(session.getAttribute("role"))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         QuestionResponseDTO response = questionService.save(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<QuestionResponseDTO> updateQuestion(
+    public ResponseEntity<?> updateQuestion(
             @PathVariable Integer id,
-            @Valid @RequestBody QuestionRequestDTO request) {
+            @Valid @RequestBody QuestionRequestDTO request,
+            HttpSession session) {
+        if (!"RECRUITER".equals(session.getAttribute("role"))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         QuestionResponseDTO response = questionService.updateQuestion(id, request);
         return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<QuestionResponseDTO> deleteQuestion(@PathVariable Integer id) {
+    public ResponseEntity<?> deleteQuestion(@PathVariable Integer id, HttpSession session) {
+        if (!"RECRUITER".equals(session.getAttribute("role"))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         QuestionResponseDTO response = questionService.deleteQuestion(id);
         return ResponseEntity.ok(response);
     }
