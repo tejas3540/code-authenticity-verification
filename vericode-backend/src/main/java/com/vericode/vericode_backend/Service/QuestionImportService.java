@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -53,24 +54,33 @@ public class QuestionImportService {
             throw new IllegalArgumentException("Use a LeetCode problem URL such as https://leetcode.com/problems/two-sum/.");
         }
 
+        String query = "query questionContent($titleSlug: String!) { question(titleSlug: $titleSlug) { title content difficulty exampleTestcases constraints codeSnippets { lang langSlug code } } }";
         ObjectNode variables = objectMapper.createObjectNode();
         variables.put("titleSlug", slug);
-
         ObjectNode payload = objectMapper.createObjectNode();
-        payload.put("query", "query questionContent($titleSlug: String!) { question(titleSlug: $titleSlug) { title content difficulty exampleTestcases constraints codeSnippets { lang langSlug code } } }");
+        payload.put("query", query);
         payload.set("variables", variables);
 
-        HttpRequest request = HttpRequest.newBuilder(URI.create(LEETCODE_GRAPHQL))
-                .timeout(Duration.ofSeconds(20))
-                .header("Accept", "application/json")
-                .header("Content-Type", "application/json")
-                .header("User-Agent", USER_AGENT)
-                .header("Referer", "https://leetcode.com/problems/" + slug + "/")
-                .header("Origin", "https://leetcode.com")
-                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
-                .build();
+        HttpResponse<String> response = sendLeetCodePost(payload, slug);
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        // Some networks/proxies reject POST requests to LeetCode's GraphQL endpoint.
+        // Fall back to the public GET form used by LeetCode clients rather than making
+        // the recruiter manually copy the problem into VeriCode.
+        if (response.statusCode() / 100 != 2) {
+            String encodedQuery = URLEncoder.encode(
+                    "query { question(titleSlug: \"" + slug + "\") { title content difficulty exampleTestcases constraints codeSnippets { lang langSlug code } } }",
+                    StandardCharsets.UTF_8);
+            URI getUri = URI.create(LEETCODE_GRAPHQL + "?query=" + encodedQuery);
+            HttpRequest getRequest = HttpRequest.newBuilder(getUri)
+                    .timeout(Duration.ofSeconds(20))
+                    .header("Accept", "application/json")
+                    .header("User-Agent", USER_AGENT)
+                    .header("Referer", "https://leetcode.com/problems/" + slug + "/")
+                    .GET()
+                    .build();
+            response = httpClient.send(getRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        }
+
         if (response.statusCode() / 100 != 2) {
             throw new IllegalStateException("LeetCode returned HTTP " + response.statusCode() + ". The problem may be temporarily unavailable or protected.");
         }
@@ -99,6 +109,19 @@ public class QuestionImportService {
         result.setLanguage("JAVA");
         result.setNote("Imported as a draft. Review the statement and add VeriCode test cases before publishing.");
         return result;
+    }
+
+    private HttpResponse<String> sendLeetCodePost(ObjectNode payload, String slug) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(LEETCODE_GRAPHQL))
+                .timeout(Duration.ofSeconds(20))
+                .header("Accept", "application/json")
+                .header("Content-Type", "application/json")
+                .header("User-Agent", USER_AGENT)
+                .header("Referer", "https://leetcode.com/problems/" + slug + "/")
+                .header("Origin", "https://leetcode.com")
+                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
     }
 
     private QuestionImportResponseDTO importHackerRank(URI sourceUri) throws IOException, InterruptedException {
