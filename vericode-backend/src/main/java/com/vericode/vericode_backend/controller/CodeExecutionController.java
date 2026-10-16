@@ -4,13 +4,16 @@ import com.vericode.vericode_backend.Service.CodeExecutionService;
 import com.vericode.vericode_backend.dto.CodeEvaluationRequestDTO;
 import com.vericode.vericode_backend.dto.CodeExecutionRequestDTO;
 import com.vericode.vericode_backend.dto.CodeExecutionResponseDTO;
+import com.vericode.vericode_backend.model.Assessment;
 import com.vericode.vericode_backend.model.TestCase;
+import com.vericode.vericode_backend.repository.AssessmentRepository;
 import com.vericode.vericode_backend.repository.TestCaseRepository;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,10 +24,14 @@ import java.util.Map;
 public class CodeExecutionController {
     private final CodeExecutionService codeExecutionService;
     private final TestCaseRepository testCaseRepository;
+    private final AssessmentRepository assessmentRepository;
 
-    public CodeExecutionController(CodeExecutionService codeExecutionService, TestCaseRepository testCaseRepository) {
+    public CodeExecutionController(CodeExecutionService codeExecutionService,
+                                   TestCaseRepository testCaseRepository,
+                                   AssessmentRepository assessmentRepository) {
         this.codeExecutionService = codeExecutionService;
         this.testCaseRepository = testCaseRepository;
+        this.assessmentRepository = assessmentRepository;
     }
 
     @PostMapping("/run")
@@ -37,8 +44,18 @@ public class CodeExecutionController {
 
     @PostMapping("/evaluate")
     public ResponseEntity<?> evaluate(@Valid @RequestBody CodeEvaluationRequestDTO request, HttpSession session) {
-        if (session.getAttribute("userId") == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        Integer userId = (Integer) session.getAttribute("userId");
+        if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         if (!"STUDENT".equals(session.getAttribute("role"))) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        boolean assignedQuestion = assessmentRepository.findDistinctByStudents_Id(userId).stream()
+                .map(Assessment::getQuestions)
+                .flatMap(List::stream)
+                .anyMatch(question -> question.getId().equals(request.getQuestionId()));
+        if (!assignedQuestion) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "This question is not part of an assessment assigned to you."));
+        }
 
         List<TestCase> cases = testCaseRepository.findByQuestion_IdOrderByIdAsc(request.getQuestionId());
         if (cases.isEmpty()) return ResponseEntity.badRequest().body(Map.of("message", "This question has no test cases."));
