@@ -7,11 +7,12 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -51,35 +52,35 @@ public class QuestionImportService {
             throw new IllegalArgumentException("Use a LeetCode problem URL such as /problems/two-sum/.");
         }
 
-        String query = "query questionData($titleSlug: String!) { question(titleSlug: $titleSlug) { title content difficulty exampleTestcases constraints codeSnippets { lang langSlug code } } }";
-        String body = objectMapper.writeValueAsString(Map.of(
-                "query", query,
-                "variables", Map.of("titleSlug", slug)
-        ));
+        // LeetCode's public GraphQL endpoint accepts a GET query without requiring a
+        // logged-in session. Keeping the slug inside the query also avoids sending a
+        // POST body that some edge/proxy configurations reject.
+        String query = "query { question(titleSlug: \"" + slug + "\") { title content difficulty exampleTestcases constraints codeSnippets { lang langSlug code } } }";
+        String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
+        URI graphqlUri = URI.create(LEETCODE_GRAPHQL + "?query=" + encodedQuery);
 
-        HttpRequest request = HttpRequest.newBuilder(URI.create(LEETCODE_GRAPHQL))
-                .timeout(Duration.ofSeconds(15))
-                .header("Content-Type", "application/json")
+        HttpRequest request = HttpRequest.newBuilder(graphqlUri)
+                .timeout(Duration.ofSeconds(20))
                 .header("Accept", "application/json")
                 .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36")
-                .header("Origin", "https://leetcode.com")
-                .header("Referer", "https://leetcode.com/")
-                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .header("Referer", "https://leetcode.com/problems/" + slug + "/")
+                .GET()
                 .build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() / 100 != 2) {
-            throw new IllegalStateException("LeetCode could not be reached (HTTP " + response.statusCode() + "). Try again or review the URL.");
+            throw new IllegalStateException("LeetCode returned HTTP " + response.statusCode() + ". The problem may be temporarily unavailable.");
         }
 
         JsonNode root = objectMapper.readTree(response.body());
-        if (root.has("errors") && root.path("errors").size() > 0) {
-            String message = root.path("errors").get(0).path("message").asText("LeetCode rejected the request.");
+        JsonNode errors = root.path("errors");
+        if (errors.isArray() && !errors.isEmpty()) {
+            String message = errors.get(0).path("message").asText("LeetCode rejected the request.");
             throw new IllegalStateException("LeetCode import failed: " + message);
         }
 
         JsonNode question = root.path("data").path("question");
-        if (question.isMissingNode() || question.isNull()) {
+        if (question.isMissingNode() || question.isNull() || question.path("title").asText().isBlank()) {
             throw new IllegalStateException("LeetCode question was not found. Check that the URL points to a public problem.");
         }
 
@@ -107,7 +108,7 @@ public class QuestionImportService {
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() / 100 != 2) {
-            throw new IllegalStateException("HackerRank could not be reached (HTTP " + response.statusCode() + "). Try again or review the URL.");
+            throw new IllegalStateException("HackerRank returned HTTP " + response.statusCode() + ". The challenge may require authentication.");
         }
 
         String html = response.body();
@@ -152,7 +153,7 @@ public class QuestionImportService {
     }
 
     private String extractLeetCodeSlug(String path) {
-        Matcher matcher = Pattern.compile("/problems/([^/]+)/?").matcher(path);
+        Matcher matcher = Pattern.compile("/problems/([a-zA-Z0-9-]+)/?").matcher(path);
         return matcher.find() ? matcher.group(1) : null;
     }
 
