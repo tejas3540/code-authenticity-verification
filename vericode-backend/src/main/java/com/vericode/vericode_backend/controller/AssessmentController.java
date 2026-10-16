@@ -30,6 +30,18 @@ public class AssessmentController {
         return ResponseEntity.status(HttpStatus.CREATED).body(assessmentService.create(userId, request));
     }
 
+    /**
+     * Backwards-compatible endpoint used by the student workspace.
+     * A user only receives assessments assigned to their current session account.
+     */
+    @GetMapping
+    public ResponseEntity<List<AssessmentResponseDTO>> getAssessments(HttpSession session) {
+        Integer userId = (Integer) session.getAttribute("userId");
+        String role = (String) session.getAttribute("role");
+        if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        return ResponseEntity.ok(assessmentService.getForUser(userId, role));
+    }
+
     @GetMapping("/my")
     public ResponseEntity<List<AssessmentResponseDTO>> getMyAssessments(HttpSession session) {
         Integer userId = (Integer) session.getAttribute("userId");
