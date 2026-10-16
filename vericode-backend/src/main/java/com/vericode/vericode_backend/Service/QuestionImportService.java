@@ -11,14 +11,17 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
 public class QuestionImportService {
+    private static final String LEETCODE_GRAPHQL = "https://leetcode.com/graphql/";
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(8))
+            .connectTimeout(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
@@ -36,9 +39,9 @@ public class QuestionImportService {
             throw new IllegalArgumentException("Only LeetCode and HackerRank question URLs are supported.");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("Question import was interrupted.");
+            throw new IllegalStateException("Question import was interrupted. Please try again.");
         } catch (IOException e) {
-            throw new IllegalStateException("Could not read the question from the supplied URL.");
+            throw new IllegalStateException("Could not connect to the question source. Check your internet connection and try again.");
         }
     }
 
@@ -49,26 +52,35 @@ public class QuestionImportService {
         }
 
         String query = "query questionData($titleSlug: String!) { question(titleSlug: $titleSlug) { title content difficulty exampleTestcases constraints codeSnippets { lang langSlug code } } }";
-        String body = objectMapper.writeValueAsString(java.util.Map.of(
+        String body = objectMapper.writeValueAsString(Map.of(
                 "query", query,
-                "variables", java.util.Map.of("titleSlug", slug)
+                "variables", Map.of("titleSlug", slug)
         ));
 
-        HttpRequest request = HttpRequest.newBuilder(URI.create("https://leetcode.com/graphql"))
-                .timeout(Duration.ofSeconds(12))
+        HttpRequest request = HttpRequest.newBuilder(URI.create(LEETCODE_GRAPHQL))
+                .timeout(Duration.ofSeconds(15))
                 .header("Content-Type", "application/json")
-                .header("User-Agent", "VeriCode/1.0")
+                .header("Accept", "application/json")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36")
+                .header("Origin", "https://leetcode.com")
+                .header("Referer", "https://leetcode.com/")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() / 100 != 2) {
-            throw new IllegalStateException("LeetCode did not return the question. HTTP " + response.statusCode());
+            throw new IllegalStateException("LeetCode could not be reached (HTTP " + response.statusCode() + "). Try again or review the URL.");
         }
 
-        JsonNode question = objectMapper.readTree(response.body()).path("data").path("question");
+        JsonNode root = objectMapper.readTree(response.body());
+        if (root.has("errors") && root.path("errors").size() > 0) {
+            String message = root.path("errors").get(0).path("message").asText("LeetCode rejected the request.");
+            throw new IllegalStateException("LeetCode import failed: " + message);
+        }
+
+        JsonNode question = root.path("data").path("question");
         if (question.isMissingNode() || question.isNull()) {
-            throw new IllegalStateException("LeetCode question was not found.");
+            throw new IllegalStateException("LeetCode question was not found. Check that the URL points to a public problem.");
         }
 
         QuestionImportResponseDTO result = new QuestionImportResponseDTO();
@@ -87,20 +99,22 @@ public class QuestionImportService {
 
     private QuestionImportResponseDTO importHackerRank(URI uri) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(uri)
-                .timeout(Duration.ofSeconds(12))
-                .header("User-Agent", "VeriCode/1.0")
+                .timeout(Duration.ofSeconds(15))
+                .header("Accept", "text/html,application/xhtml+xml")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36")
                 .GET()
                 .build();
+
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() / 100 != 2) {
-            throw new IllegalStateException("HackerRank did not return the question page. HTTP " + response.statusCode());
+            throw new IllegalStateException("HackerRank could not be reached (HTTP " + response.statusCode() + "). Try again or review the URL.");
         }
 
         String html = response.body();
         String title = firstMatch(html, "<title[^>]*>(.*?)</title>");
         String description = firstMatch(html, "<meta[^>]+name=[\\\"']description[\\\"'][^>]+content=[\\\"'](.*?)[\\\"']");
         if (title == null || title.isBlank()) {
-            throw new IllegalStateException("Could not identify the HackerRank question title.");
+            throw new IllegalStateException("Could not identify the HackerRank question. The page may require authentication.");
         }
 
         title = decodeHtml(title).replace(" | HackerRank", "").trim();
@@ -116,13 +130,13 @@ public class QuestionImportService {
         result.setConstraints("Review the source question and enter its constraints here.");
         result.setTimeLimitSeconds(60);
         result.setLanguage("JAVA");
-        result.setNote("HackerRank question pages may not expose the complete problem body to unauthenticated clients. VeriCode imports the available metadata and leaves the fields editable for review.");
+        result.setNote("HackerRank may not expose the complete problem body to unauthenticated clients. Review the imported draft before saving.");
         return result;
     }
 
     private URI validateUrl(String rawUrl) {
         try {
-            URI uri = URI.create(rawUrl.trim());
+            URI uri = URI.create(rawUrl == null ? "" : rawUrl.trim());
             if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) {
                 throw new IllegalArgumentException("Enter a valid HTTPS question URL.");
             }
