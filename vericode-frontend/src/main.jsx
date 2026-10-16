@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
 import QuestionImport from "./QuestionImport.jsx";
 import "./index.css";
+import "./QuestionImport.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
