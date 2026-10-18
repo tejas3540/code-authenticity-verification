@@ -68,7 +68,7 @@ public class QuestionImportService {
         result.setSourceUrl(sourceUri.toString());
         result.setTitle(question.path("title").asText(slug));
         String content = question.path("content").asText("");
-        result.setDescription(stripHtml(content));
+        result.setDescription(extractDescription(content));
         result.setInputDescription("Use the input format described in the original problem.");
         result.setOutputDescription("Use the output format described in the original problem.");
         result.setConstraints(extractConstraints(content));
@@ -78,11 +78,19 @@ public class QuestionImportService {
         return result;
     }
 
+    private String extractDescription(String html) {
+        if (html == null || html.isBlank()) return "";
+        Matcher matcher = Pattern.compile("(?is)(.*?)(?:<(?:strong|b|h[1-6])[^>]*>\\s*Constraints\\s*:??\\s*</(?:strong|b|h[1-6])>)").matcher(html);
+        if (matcher.find()) return stripHtml(matcher.group(1));
+        return stripHtml(html);
+    }
+
     private String extractConstraints(String html) {
         if (html == null || html.isBlank()) return "";
-        String section = html.replaceAll("(?is).*?(?:<strong[^>]*>|<b[^>]*>|<h[1-6][^>]*>)\\s*Constraints\\s*(?:</strong>|</b>|</h[1-6]>)(.*)", "$1");
-        if (section.equals(html)) return "";
-        section = section.replaceAll("(?is)(?:<strong[^>]*>|<b[^>]*>|<h[1-6][^>]*>)\\s*(?:Follow-up|Follow up|Related Topics|Similar Questions|Note)\\s*(?:</strong>|</b>|</h[1-6]>).*", "");
+        Matcher matcher = Pattern.compile("(?is)(?:<(?:strong|b|h[1-6])[^>]*>\\s*Constraints\\s*:??\\s*</(?:strong|b|h[1-6])>)(.*)").matcher(html);
+        if (!matcher.find()) return "";
+        String section = matcher.group(1);
+        section = section.replaceAll("(?is)(?:<(?:strong|b|h[1-6])[^>]*>\\s*(?:Follow-up|Follow up|Related Topics|Similar Questions|Note)\\s*</(?:strong|b|h[1-6])>).*$", "");
         return stripHtml(section);
     }
 
@@ -112,6 +120,6 @@ public class QuestionImportService {
 
     private String extractLeetCodeSlug(String path) { Matcher m = Pattern.compile("/problems/([a-zA-Z0-9-]+)/?").matcher(path); return m.find() ? m.group(1) : null; }
     private String firstMatch(String text, String regex) { Matcher m = Pattern.compile(regex, Pattern.CASE_INSENSITIVE | Pattern.DOTALL).matcher(text); return m.find() ? m.group(1) : null; }
-    private String stripHtml(String value) { return decodeHtml(value.replaceAll("<br\\s*/?>", "\\n").replaceAll("</p>", "\\n\\n").replaceAll("<[^>]+>", "")).replaceAll("\\n{3,}", "\\n\\n").trim(); }
+    private String stripHtml(String value) { return decodeHtml(value.replaceAll("<br\\s*/?>", "\\n").replaceAll("</p>", "\\n\\n").replaceAll("<li[^>]*>", "\\n• ").replaceAll("<[^>]+>", "")).replaceAll("\\n{3,}", "\\n\\n").trim(); }
     private String decodeHtml(String value) { return value.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'"); }
 }
