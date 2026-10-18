@@ -19,7 +19,6 @@ import java.util.regex.Pattern;
 public class QuestionImportService {
     private static final String LEETCODE_GRAPHQL = "https://leetcode.com/graphql/";
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36";
-
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NORMAL).build();
 
@@ -50,18 +49,14 @@ public class QuestionImportService {
         payload.put("query", query);
         payload.set("variables", variables);
 
-        HttpRequest request = HttpRequest.newBuilder(URI.create(LEETCODE_GRAPHQL))
-                .timeout(Duration.ofSeconds(20))
-                .header("Accept", "application/json")
-                .header("Content-Type", "application/json")
-                .header("User-Agent", USER_AGENT)
-                .header("Referer", "https://leetcode.com/problems/" + slug + "/")
+        HttpRequest request = HttpRequest.newBuilder(URI.create(LEETCODE_GRAPHQL)).timeout(Duration.ofSeconds(20))
+                .header("Accept", "application/json").header("Content-Type", "application/json")
+                .header("User-Agent", USER_AGENT).header("Referer", "https://leetcode.com/problems/" + slug + "/")
                 .header("Origin", "https://leetcode.com")
                 .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload))).build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         if (response.statusCode() / 100 != 2) throw new IllegalStateException("LeetCode returned HTTP " + response.statusCode() + ". The source rejected the request.");
-
         JsonNode root = objectMapper.readTree(response.body());
         JsonNode errors = root.path("errors");
         if (errors.isArray() && !errors.isEmpty()) throw new IllegalStateException("LeetCode import failed: " + errors.get(0).path("message").asText("Unknown GraphQL error"));
@@ -72,14 +67,23 @@ public class QuestionImportService {
         result.setSource("LEETCODE");
         result.setSourceUrl(sourceUri.toString());
         result.setTitle(question.path("title").asText(slug));
-        result.setDescription(stripHtml(question.path("content").asText("")));
+        String content = question.path("content").asText("");
+        result.setDescription(stripHtml(content));
         result.setInputDescription("Use the input format described in the original problem.");
         result.setOutputDescription("Use the output format described in the original problem.");
-        result.setConstraints("");
+        result.setConstraints(extractConstraints(content));
         result.setTimeLimitSeconds(60);
         result.setLanguage("JAVA");
         result.setNote("Imported as a draft. Review the statement and add VeriCode test cases before publishing.");
         return result;
+    }
+
+    private String extractConstraints(String html) {
+        if (html == null || html.isBlank()) return "";
+        String section = html.replaceAll("(?is).*?(?:<strong[^>]*>|<b[^>]*>|<h[1-6][^>]*>)\\s*Constraints\\s*(?:</strong>|</b>|</h[1-6]>)(.*)", "$1");
+        if (section.equals(html)) return "";
+        section = section.replaceAll("(?is)(?:<strong[^>]*>|<b[^>]*>|<h[1-6][^>]*>)\\s*(?:Follow-up|Follow up|Related Topics|Similar Questions|Note)\\s*(?:</strong>|</b>|</h[1-6]>).*", "");
+        return stripHtml(section);
     }
 
     private QuestionImportResponseDTO importHackerRank(URI sourceUri) throws IOException, InterruptedException {
@@ -93,8 +97,7 @@ public class QuestionImportService {
         QuestionImportResponseDTO result = new QuestionImportResponseDTO();
         result.setSource("HACKERRANK"); result.setSourceUrl(sourceUri.toString()); result.setTitle(decodeHtml(title).replace(" | HackerRank", "").trim());
         result.setDescription("Review the source challenge and complete the problem statement before publishing.");
-        result.setInputDescription("Review the source challenge and enter its input format here."); result.setOutputDescription("Review the source challenge and enter its output format here."); result.setConstraints("Review the source challenge and enter its constraints here."); result.setTimeLimitSeconds(60); result.setLanguage("JAVA");
-        result.setNote("Imported as a draft. Verify the challenge before publishing."); return result;
+        result.setInputDescription("Review the source challenge and enter its input format here."); result.setOutputDescription("Review the source challenge and enter its output format here."); result.setConstraints("Review the source challenge and enter its constraints here."); result.setTimeLimitSeconds(60); result.setLanguage("JAVA"); result.setNote("Imported as a draft. Verify the challenge before publishing."); return result;
     }
 
     private URI validateUrl(String rawUrl) {
