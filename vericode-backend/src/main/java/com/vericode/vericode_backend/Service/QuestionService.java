@@ -7,6 +7,8 @@ import com.vericode.vericode_backend.repository.QuestionRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -38,6 +40,10 @@ public class QuestionService {
                 .stream()
                 .map(this::toResponseDTO)
                 .toList();
+    }
+
+    public Page<QuestionResponseDTO> getQuestionsPage(Pageable pageable) {
+        return questionRepository.findAll(pageable).map(this::toResponseDTO);
     }
 
     @Cacheable(cacheNames = "questionById", key = "#id")
