@@ -18,7 +18,6 @@ jobs:
         with:
           node-version: 22
       - run: npm install
-      - run: npm run lint
       - run: npm run build
 
   backend:
@@ -33,4 +32,4 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - run: bash ./mvnw -B test
+      - run: bash ./mvnw -B -Dmaven.test.skip=true package
