@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  base: process.env.VITE_CDN_URL || "/",
   build: {
     minify: "oxc",
     cssMinify: "lightningcss",
@@ -21,7 +22,7 @@ export default defineConfig({
             },
             {
               name: "vendor",
-              test: /node_modules[\\/]/,
+              test: /node_modules[\\/] /,
               priority: 10,
             },
           ],
