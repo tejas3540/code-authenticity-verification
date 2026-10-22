@@ -3,6 +3,7 @@ package com.vericode.vericode_backend.Service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vericode.vericode_backend.dto.QuestionImportResponseDTO;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -22,6 +23,7 @@ public class QuestionImportService {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NORMAL).build();
 
+    @Cacheable(cacheNames = "questionImports", key = "#url == null ? '' : #url.trim()")
     public QuestionImportResponseDTO preview(String url) {
         URI uri = validateUrl(url);
         String host = uri.getHost().toLowerCase();

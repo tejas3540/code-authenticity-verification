@@ -3,7 +3,9 @@ package com.vericode.vericode_backend.model;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "test_cases")
+@Table(name = "test_cases", indexes = {
+        @Index(name = "idx_test_cases_question", columnList = "question_id")
+})
 public class TestCase {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -4,7 +4,11 @@ import com.vericode.vericode_backend.dto.QuestionRequestDTO;
 import com.vericode.vericode_backend.dto.QuestionResponseDTO;
 import com.vericode.vericode_backend.model.Question;
 import com.vericode.vericode_backend.repository.QuestionRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -12,9 +16,16 @@ import java.util.List;
 @Service
 public class QuestionService {
 
-    @Autowired
-    private QuestionRepository questionRepository;
+    private final QuestionRepository questionRepository;
 
+    public QuestionService(QuestionRepository questionRepository) {
+        this.questionRepository = questionRepository;
+    }
+
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "questions", allEntries = true),
+            @CacheEvict(cacheNames = "questionById", allEntries = true)
+    })
     public QuestionResponseDTO save(QuestionRequestDTO request) {
         Question question = new Question();
         mapRequestToQuestion(request, question);
@@ -23,6 +34,7 @@ public class QuestionService {
         return toResponseDTO(savedQuestion);
     }
 
+    @Cacheable(cacheNames = "questions")
     public List<QuestionResponseDTO> getAllQuestions() {
         return questionRepository.findAll()
                 .stream()
@@ -30,6 +42,11 @@ public class QuestionService {
                 .toList();
     }
 
+    public Page<QuestionResponseDTO> getQuestionsPage(Pageable pageable) {
+        return questionRepository.findAll(pageable).map(this::toResponseDTO);
+    }
+
+    @Cacheable(cacheNames = "questionById", key = "#id")
     public QuestionResponseDTO getQuestionById(Integer id) {
         Question question = questionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -38,6 +55,10 @@ public class QuestionService {
         return toResponseDTO(question);
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "questions", allEntries = true),
+            @CacheEvict(cacheNames = "questionById", key = "#id")
+    })
     public QuestionResponseDTO updateQuestion(Integer id, QuestionRequestDTO request) {
         Question question = questionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -49,6 +70,10 @@ public class QuestionService {
         return toResponseDTO(updatedQuestion);
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "questions", allEntries = true),
+            @CacheEvict(cacheNames = "questionById", key = "#id")
+    })
     public QuestionResponseDTO deleteQuestion(Integer id) {
         Question question = questionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException(

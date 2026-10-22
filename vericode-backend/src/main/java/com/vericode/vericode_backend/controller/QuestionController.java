@@ -5,6 +5,9 @@ import com.vericode.vericode_backend.dto.QuestionRequestDTO;
 import com.vericode.vericode_backend.dto.QuestionResponseDTO;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +30,20 @@ public class QuestionController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         return ResponseEntity.ok(questionService.getAllQuestions());
+    }
+
+    @GetMapping("/page")
+    public ResponseEntity<?> getQuestionsPage(
+            HttpSession session,
+            @PageableDefault(size = 20, sort = "id") Pageable pageable) {
+        if (session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        if (pageable.getPageSize() > 100) {
+            return ResponseEntity.badRequest().body("Page size cannot exceed 100.");
+        }
+        Page<QuestionResponseDTO> page = questionService.getQuestionsPage(pageable);
+        return ResponseEntity.ok(page);
     }
 
     @GetMapping("/{id}")
