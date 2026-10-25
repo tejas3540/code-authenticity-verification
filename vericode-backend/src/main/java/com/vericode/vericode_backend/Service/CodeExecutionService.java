@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -48,6 +49,10 @@ public class CodeExecutionService {
             String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             int exitCode = process.exitValue();
             if (exitCode != 0) {
+                if (isDockerUnavailableOutput(output)) {
+                    return new CodeExecutionResponseDTO(false, false, false, "",
+                            "Docker execution failed: Docker Desktop is not running on the backend computer.", elapsed);
+                }
                 return new CodeExecutionResponseDTO(false, false, false, "", limit(output), elapsed);
             }
 
@@ -68,6 +73,15 @@ public class CodeExecutionService {
     }
 
     private long elapsed(long started) { return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started); }
+
+    boolean isDockerUnavailableOutput(String output) {
+        if (output == null) return false;
+        String message = output.toLowerCase(Locale.ROOT);
+        return message.contains("failed to connect to the docker api")
+                || message.contains("cannot connect to the docker daemon")
+                || message.contains("error during connect")
+                || message.contains("is the docker daemon running");
+    }
 
     private String normalize(String value) {
         return value == null ? "" : value.replace("\r\n", "\n").trim();

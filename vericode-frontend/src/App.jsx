@@ -475,6 +475,7 @@ function CodingWorkspace({ assessment, attempt, onExit }) {
   const updateCode = value => {
     setCode(value);
     setDrafts(previous => ({ ...previous, [question.id]: value }));
+    setResult(null);
     record("code_edit", `${value.length} characters`);
   };
 
@@ -512,14 +513,11 @@ function CodingWorkspace({ assessment, attempt, onExit }) {
     setBusy(true);
     setResult({ loading: true });
     try {
-      const evaluation = await jsonFetch(`${EXECUTION}/evaluate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ questionId: question.id, sourceCode: code }) });
-      const runnerError = codeRunnerUnavailable(evaluation);
-      if (runnerError) { setResult({ error: runnerError }); return; }
-      const submitEvent = { eventType: "submit", occurredAt: new Date().toISOString(), details: `${evaluation.passed}/${evaluation.total} test cases passed` };
+      const submitEvent = { eventType: "submit", occurredAt: new Date().toISOString(), details: "Solution submitted" };
       const submission = await jsonFetch(SUBMISSIONS, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assessmentId: assessment.id, questionId: question.id, sourceCode: code, behaviorEvents: [...events, submitEvent] }) });
       setEvents([]);
       try { sessionStorage.removeItem(eventStorageKey); } catch { /* Storage can be unavailable in private browsing. */ }
-      setResult({ evaluation });
+      setResult({ submitted: true });
       if (submission.assessmentComplete) {
         setCompleted(true);
       } else setSubmittedQuestions(previous => new Set(previous).add(question.id));
@@ -547,7 +545,7 @@ function CodingWorkspace({ assessment, attempt, onExit }) {
         <div className="editor-top"><div><span className="eyebrow">CODE EDITOR</span><strong>{question.language || "Java 21"}</strong></div><span className="editor-status">Isolated execution</span></div>
         <textarea className="ide" aria-label="Solution code" spellCheck="false" value={code} onKeyDown={handleEditorKeyDown} onPaste={() => record("paste", "Paste event in code editor")} onChange={e => updateCode(e.target.value)}/>
         <section className="console" aria-live="polite"><div className="console-head"><div><b>Test results</b><small>All assessment cases, including hidden cases</small></div>{result?.evaluation && <span className={result.evaluation.passed === result.evaluation.total ? "test-count pass" : "test-count fail"}>{result.evaluation.passed}/{result.evaluation.total} passed</span>}</div>
-          {result?.loading ? <div className="console-empty running-results"><span className="running-dot"/>Running every test case…</div> : result?.error ? <div className="console-empty error-text">{result.error}</div> : result?.evaluation ? <div className="console-body"><div className={result.evaluation.passed === result.evaluation.total ? "evaluation-banner passed" : "evaluation-banner failed"}><span>{result.evaluation.passed === result.evaluation.total ? "✓" : "×"}</span><strong>{result.evaluation.passed === result.evaluation.total ? "All test cases passed" : `${result.evaluation.total - result.evaluation.passed} test case${result.evaluation.total - result.evaluation.passed === 1 ? "" : "s"} failed`}</strong></div><div className="test-result-list">{(result.evaluation.results || []).map((r, i) => <article className={r.passed ? "test-result pass" : "test-result fail"} key={r.testCaseId || i}><span className="test-result-icon">{r.passed ? "✓" : "×"}</span><div className="test-result-copy"><b>Test case {i + 1}</b><small>{r.hidden ? "Hidden case" : "Sample case"}{r.executionTimeMs != null ? ` · ${r.executionTimeMs} ms` : ""}</small>{r.error && <pre>{r.error}</pre>}</div></article>)}</div></div> : <div className="console-empty">Press <b>Run tests</b> to check your code against every test case.</div>}
+          {result?.loading ? <div className="console-empty running-results"><span className="running-dot"/>Running every test case…</div> : result?.error ? <div className="console-empty error-text">{result.error}</div> : result?.evaluation ? <div className="console-body"><div className={result.evaluation.passed === result.evaluation.total ? "evaluation-banner passed" : "evaluation-banner failed"}><span>{result.evaluation.passed === result.evaluation.total ? "✓" : "×"}</span><strong>{result.evaluation.passed === result.evaluation.total ? "All test cases passed" : `${result.evaluation.total - result.evaluation.passed} test case${result.evaluation.total - result.evaluation.passed === 1 ? "" : "s"} failed`}</strong></div><div className="test-result-list">{(result.evaluation.results || []).map((r, i) => <article className={r.passed ? "test-result pass" : "test-result fail"} key={r.testCaseId || i}><span className="test-result-icon">{r.passed ? "✓" : "×"}</span><div className="test-result-copy"><b>Test case {i + 1}</b><small>{r.hidden ? "Hidden case" : "Sample case"}{r.executionTimeMs != null ? ` · ${r.executionTimeMs} ms` : ""}</small>{r.error && <pre>{r.error}</pre>}</div></article>)}</div></div> : result?.submitted ? <div className="console-empty result-pass" role="status">Your solution was submitted successfully.</div> : <div className="console-empty">Press <b>Run tests</b> to check your code against every test case.</div>}
         </section>
         <div className="editor-actions"><button type="button" className="run-button" disabled={busy || graceSeconds <= 0 || casesLoading || Boolean(casesError) || !cases.length} onClick={runTests}>{busy ? "Running…" : "▶ Run tests"}</button><button type="button" className="primary-button submit-button" disabled={busy || graceSeconds <= 0 || casesLoading || Boolean(casesError) || !cases.length || submittedQuestions.has(question.id)} onClick={submit}>{busy ? "Working…" : submittedQuestions.has(question.id) ? "Solution submitted" : "Submit solution"}</button>{submittedQuestions.has(question.id) && index < assessment.questions.length - 1 && <button type="button" className="next-question-button" onClick={() => goToQuestion(index + 1)}>Next question →</button>}</div>
         {seconds === 0 && graceSeconds > 0 && <div className="submission-grace" role="status">Time is up. Submit within {graceSeconds} seconds.</div>}{seconds === 0 && graceSeconds === 0 && <div className="submission-grace" role="status">The 10-second submission grace period has passed.</div>}
