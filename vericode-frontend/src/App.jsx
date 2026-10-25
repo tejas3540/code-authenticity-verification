@@ -140,9 +140,9 @@ function Dashboard({ user, onLogout }) {
         {view === "dashboard" && <Home user={user} student={student} go={setView}/>}
         {student && view === "assessments" && <StudentAssessments/>}
         {recruiter && view === "questions" && <QuestionLibrary/>}
-        {recruiter && view === "assessments" && <AssessmentBuilder/>}
+        {recruiter && view === "assessments" && <AssessmentBuilder onReviewCandidates={() => setView("candidates")}/>}
         {recruiter && view === "submissions" && <Submissions/>}
-        {recruiter && view === "candidates" && <Candidates/>}
+        {recruiter && view === "candidates" && <Candidates onCreateAssignment={() => setView("assessments")} onReviewSubmissions={() => setView("submissions")}/>}
       </div>
     </main>
   </div>;
@@ -259,12 +259,15 @@ function QuestionEditor({ question, onDone }) {
   </div>;
 }
 
-function AssessmentBuilder() {
+function AssessmentBuilder({ onReviewCandidates }) {
   const [questions, setQuestions] = useState([]);
   const [selected, setSelected] = useState([]);
   const [form, setForm] = useState({ title: "", description: "", durationMinutes: 60, studentEmails: "" });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [tab, setTab] = useState("create");
+  const [existing, setExisting] = useState([]);
+  const [loadingExisting, setLoadingExisting] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -276,18 +279,65 @@ function AssessmentBuilder() {
     return () => { mounted = false; };
   }, []);
 
+  const loadExisting = useCallback(async () => {
+    setLoadingExisting(true);
+    try {
+      const data = await jsonFetch(ASSESSMENTS);
+      setExisting(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoadingExisting(false);
+    }
+  }, []);
+
+  useEffect(() => { loadExisting(); }, [loadExisting]);
+
   const toggle = id => setSelected(x => x.includes(id) ? x.filter(v => v !== id) : [...x, id]);
   const create = async e => {
     e.preventDefault();
+    setError("");
+    setMessage("");
+    const studentEmails = form.studentEmails.split(/[,\n]/).map(x => x.trim()).filter(Boolean);
+    if (!selected.length) { setError("Select at least one question for this assignment."); return; }
+    if (!studentEmails.length) { setError("Add at least one registered student email."); return; }
     try {
-      await jsonFetch(ASSESSMENTS, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: form.title, description: form.description, durationMinutes: Number(form.durationMinutes), questionIds: selected, studentEmails: form.studentEmails.split(/[,\n]/).map(x => x.trim()).filter(Boolean) }) });
-      setMessage("Assessment created and assigned.");
+      const created = await jsonFetch(ASSESSMENTS, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: form.title, description: form.description, durationMinutes: Number(form.durationMinutes), questionIds: selected, studentEmails }) });
+      setExisting(items => [created, ...items.filter(item => item.id !== created.id)]);
+      setMessage("Assignment created. It is now available under Existing assignments.");
       setForm({ title: "", description: "", durationMinutes: 60, studentEmails: "" });
       setSelected([]);
+      setTab("existing");
     } catch (err) { setError(err.message); }
   };
 
-  return <div className="page"><div className="page-intro"><div><span className="eyebrow">ASSESSMENT BUILDER</span><h1>Create an assessment</h1><p>Select questions, set a duration, and assign registered students.</p></div></div><form className="panel assessment-builder" onSubmit={create}><Field label="Assessment title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}/><FieldArea label="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}/><div className="form-grid two"><label>Duration (minutes)<input type="number" min="1" value={form.durationMinutes} onChange={e => setForm({ ...form, durationMinutes: e.target.value })}/></label><FieldArea label="Student emails" value={form.studentEmails} onChange={e => setForm({ ...form, studentEmails: e.target.value })} rows={3}/></div><div className="builder-questions"><div className="section-heading"><div><span className="eyebrow">QUESTION BANK</span><h3>Select questions</h3></div><span>{selected.length} selected</span></div>{questions.map(q => <label className={selected.includes(q.id) ? "select-question selected" : "select-question"} key={q.id}><input type="checkbox" checked={selected.includes(q.id)} onChange={() => toggle(q.id)}/><span><b>{q.title}</b><small>{q.language} · {q.timeLimitSeconds}s</small></span></label>)}</div>{message && <div className="alert success">{message}</div>}{error && <div className="alert error">{error}</div>}<div className="form-footer"><button className="primary-button" disabled={!selected.length}>Create assessment</button></div></form></div>;
+  return <div className="page">
+    <div className="page-intro"><div><span className="eyebrow">ASSESSMENT BUILDER</span><h1>Assignments</h1><p>Create a new coding assignment or manage one you already created.</p></div></div>
+    <div className="assignment-tabs" role="tablist" aria-label="Assignment options">
+      <button type="button" role="tab" aria-selected={tab === "create"} className={tab === "create" ? "assignment-tab active" : "assignment-tab"} onClick={() => { setTab("create"); setMessage(""); }}>＋ Create new assignment</button>
+      <button type="button" role="tab" aria-selected={tab === "existing"} className={tab === "existing" ? "assignment-tab active" : "assignment-tab"} onClick={() => { setTab("existing"); setMessage(""); loadExisting(); }}>▤ Existing assignments <span>{existing.length}</span></button>
+    </div>
+    {error && <div className="alert error">{error}</div>}
+    {message && <div className="alert success">{message}</div>}
+    {tab === "create" ? <form className="panel assessment-builder" onSubmit={create}>
+      <div className="panel-heading"><div><span className="eyebrow">NEW ASSIGNMENT</span><h2>Set up the assessment</h2><p className="muted">Choose its questions, time limit, and registered students.</p></div></div>
+      <Field label="Assignment title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}/>
+      <FieldArea label="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}/>
+      <div className="form-grid two"><label>Duration (minutes)<input type="number" min="1" value={form.durationMinutes} onChange={e => setForm({ ...form, durationMinutes: e.target.value })}/></label><FieldArea label="Registered student emails" value={form.studentEmails} onChange={e => setForm({ ...form, studentEmails: e.target.value })} rows={3}/></div>
+      <div className="builder-questions"><div className="section-heading"><div><span className="eyebrow">QUESTION BANK</span><h3>Select questions</h3></div><span>{selected.length} selected</span></div>
+        {questions.length ? questions.map(q => <label className={selected.includes(q.id) ? "select-question selected" : "select-question"} key={q.id}><input type="checkbox" checked={selected.includes(q.id)} onChange={() => toggle(q.id)}/><span><b>{q.title}</b><small>{q.language} · {q.timeLimitSeconds}s</small></span></label>) : <div className="empty-state compact"><strong>No questions available</strong><span>Add questions to the Question Library before creating an assignment.</span></div>}
+      </div>
+      <div className="form-footer"><button className="primary-button" disabled={!selected.length}>Create assignment</button></div>
+    </form> : <section className="existing-assignments">
+      <div className="section-heading"><div><span className="eyebrow">YOUR ASSIGNMENTS</span><h2>Existing assignments</h2><p>New assignments appear here as soon as they are created.</p></div><button type="button" className="ghost-button" onClick={loadExisting}>Refresh</button></div>
+      {loadingExisting ? <div className="assignment-skeleton" aria-label="Loading assignments"><i/><i/><i/></div> : existing.length ? <div className="existing-assignment-grid">{existing.map(a => <article className="existing-assignment-card" key={a.id}>
+        <div className="existing-assignment-top"><span className="assignment-status"><i/> Active</span><span>{a.durationMinutes} min</span></div><h3>{a.title}</h3><p>{a.description || "Technical coding assessment"}</p>
+        <div className="assignment-summary"><span><b>{a.questions?.length || 0}</b> questions</span><span><b>{a.studentEmails?.length || 0}</b> candidates</span></div>
+        <div className="assignment-candidate-list">{(a.studentEmails || []).slice(0, 4).map(email => <span key={email}>{email}</span>)}{(a.studentEmails || []).length > 4 && <span>+{a.studentEmails.length - 4} more</span>}</div>
+        <button type="button" className="table-link" onClick={onReviewCandidates}>View candidates →</button>
+      </article>)}</div> : <div className="empty-state"><strong>No assignments yet</strong><span>Create an assignment and it will appear here for future review.</span><button type="button" className="primary-button" onClick={() => setTab("create")}>Create new assignment</button></div>}
+    </section>}
+  </div>;
 }
 
 function StudentAssessments() {
@@ -350,13 +400,14 @@ function AssessmentConsent({ assessment, onCancel, onStart }) {
 function CodingWorkspace({ assessment, attempt, onExit }) {
   const [index, setIndex] = useState(0);
   const [code, setCode] = useState(starterCode);
-  const [input, setInput] = useState("");
+  const [drafts, setDrafts] = useState({});
   const [cases, setCases] = useState([]);
   const [casesLoading, setCasesLoading] = useState(true);
   const [casesError, setCasesError] = useState("");
   const [result, setResult] = useState(null);
   const [seconds, setSeconds] = useState(attempt.remainingSeconds);
   const [graceSeconds, setGraceSeconds] = useState(attempt.graceSecondsRemaining);
+  const [submittedQuestions, setSubmittedQuestions] = useState(() => new Set());
   const [events, setEvents] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem(`vericode-events-${assessment.id}`) || "[]"); }
     catch { return []; }
@@ -405,13 +456,21 @@ function CodingWorkspace({ assessment, attempt, onExit }) {
     return () => { window.removeEventListener("blur", blur); window.removeEventListener("focus", focus); document.removeEventListener("visibilitychange", visibility); };
   }, [record]);
 
-  const run = async custom => {
-    setBusy(true); setResult({ loading: true });
-    record("code_run", custom ? "Custom input" : "Sample test");
+  const goToQuestion = nextIndex => {
+    if (nextIndex === index) return;
+    setDrafts(previous => ({ ...previous, [question.id]: code }));
+    setIndex(nextIndex);
+    setCode(drafts[assessment.questions[nextIndex].id] || starterCode);
+    setResult(null);
+  };
+
+  const runTests = async () => {
+    setBusy(true);
+    setResult({ loading: true });
+    record("code_run", "Run all assessment test cases");
     try {
-      const sample = samples[0];
-      const data = await jsonFetch(`${EXECUTION}/run`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sourceCode: code, input: custom ? input : sample?.input || "", expectedOutput: custom ? "" : sample?.expectedOutput || "", timeLimitSeconds: question.timeLimitSeconds }) });
-      setResult({ single: data });
+      const evaluation = await jsonFetch(`${EXECUTION}/evaluate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ questionId: question.id, sourceCode: code }) });
+      setResult({ evaluation });
     } catch (e) { setResult({ error: e.message }); }
     finally { setBusy(false); }
   };
@@ -422,6 +481,7 @@ function CodingWorkspace({ assessment, attempt, onExit }) {
       return;
     }
     setBusy(true);
+    setResult({ loading: true });
     try {
       const evaluation = await jsonFetch(`${EXECUTION}/evaluate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ questionId: question.id, sourceCode: code }) });
       const submitEvent = { eventType: "submit", occurredAt: new Date().toISOString(), details: `${evaluation.passed}/${evaluation.total} test cases passed` };
@@ -431,9 +491,7 @@ function CodingWorkspace({ assessment, attempt, onExit }) {
       setResult({ evaluation });
       if (submission.assessmentComplete) {
         setCompleted(true);
-      } else if (index < assessment.questions.length - 1) {
-        setTimeout(() => { setIndex(index + 1); setCode(starterCode); }, 700);
-      }
+      } else setSubmittedQuestions(previous => new Set(previous).add(question.id));
     } catch (e) { setResult({ error: e.message }); }
     finally { setBusy(false); }
   };
@@ -441,7 +499,30 @@ function CodingWorkspace({ assessment, attempt, onExit }) {
   if (completed) return <div className="exam-shell"><section className="panel assessment-complete"><span className="eyebrow">ASSESSMENT COMPLETE</span><h1>{assessment.title}</h1><p>Your submitted solutions are saved.</p><button type="button" className="primary-button" onClick={onExit}>Return to assessments</button></section></div>;
 
   const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-  return <div className="exam-shell"><header className="exam-header"><div className="exam-brand"><div className="brand-mark">VC</div><div><b>{assessment.title}</b><span>Question {index + 1} of {assessment.questions.length}</span></div></div><div className={seconds < 300 ? "timer danger" : "timer"}>◷ {time}</div><button type="button" className="ghost-button dark" onClick={onExit}>Exit</button></header><div className="exam-body"><aside className="question-nav"><span className="eyebrow">QUESTIONS</span>{assessment.questions.map((q, i) => <button type="button" key={q.id} className={i === index ? "question-nav-item active" : "question-nav-item"} onClick={() => setIndex(i)}><span>{i + 1}</span><div><b>{q.title}</b><small>{i === index ? "In progress" : "Open"}</small></div></button>)}</aside><section className="problem-pane"><div className="problem-scroll"><span className="eyebrow">PROBLEM {index + 1}</span><h1>{question.title}</h1><div className="problem-tags"><span>Java</span><span>{question.timeLimitSeconds}s</span></div><div className="statement"><p>{question.description}</p><h3>Input</h3><p>{question.inputDescription}</p><h3>Output</h3><p>{question.outputDescription}</p><h3>Constraints</h3><pre>{question.constraints}</pre>{casesLoading ? <p className="muted">Loading visible examples…</p> : casesError ? <div className="alert error">Could not load test cases: {casesError}</div> : samples.length > 0 ? <><h3>Examples</h3>{samples.map((c, i) => <div className="example" key={i}><div><span>Input</span><pre>{c.input}</pre></div><div><span>Output</span><pre>{c.expectedOutput}</pre></div></div>)}</> : <p className="muted">No visible sample cases were added for this question.</p>}</div></div></section><section className="editor-pane"><div className="editor-top"><div><span className="eyebrow">CODE EDITOR</span><strong>Java 21</strong></div><span className="editor-status">Docker execution</span></div><textarea className="ide" spellCheck="false" value={code} onPaste={() => record("paste", "Paste event in code editor")} onChange={e => { setCode(e.target.value); record("code_edit", `${e.target.value.length} characters`); }}/><div className="console"><div className="console-head"><b>Test results</b><span>{result?.evaluation ? `${result.evaluation.passed}/${result.evaluation.total} passed` : ""}</span></div>{result?.loading ? <div className="console-body">Running your code…</div> : result?.error ? <div className="console-body error-text">{result.error}</div> : result?.evaluation ? <div className="console-body"><strong>{result.evaluation.passed}/{result.evaluation.total} test cases passed</strong><div className="test-result-list">{result.evaluation.results.map((r, i) => <div className={r.passed ? "test-result pass" : "test-result fail"} key={i}><span>{r.passed ? "✓" : "×"}</span>Test case {i + 1}{r.hidden ? " · hidden" : ""}<small>{r.executionTimeMs} ms</small></div>)}</div></div> : result?.single ? <div className="console-body"><strong className={result.single.passed ? "result-pass" : "result-fail"}>{result.single.passed ? "✓ Sample passed" : "× Sample failed"}</strong>{result.single.error && <pre>{result.single.error}</pre>}{result.single.output && <pre>{result.single.output}</pre>}</div> : <div className="console-empty">Run your code to see execution results.</div>}</div><div className="editor-actions"><button type="button" className="ghost-button" disabled={busy || graceSeconds === 0} onClick={() => run(false)}>Run sample</button><button type="button" className="ghost-button" disabled={busy || graceSeconds === 0} onClick={() => run(true)}>Run custom</button><button type="button" className="primary-button" disabled={busy || graceSeconds === 0} onClick={submit}>{busy ? "Evaluating…" : "Submit solution"}</button></div>{seconds === 0 && graceSeconds > 0 && <div className="submission-grace" role="status">Time is up. You have {graceSeconds} seconds to submit.</div>}{seconds === 0 && graceSeconds === 0 && <div className="submission-grace" role="status">The 10-second submission grace period has passed.</div>}<label className="custom-input">Custom input<textarea rows="3" value={input} onChange={e => setInput(e.target.value)} placeholder="Try your own input"/></label></section></div></div>;
+  return <div className="exam-shell">
+    <header className="exam-header"><div className="exam-brand"><div className="brand-mark">VC</div><div><b>{assessment.title}</b><span>Question {index + 1} of {assessment.questions.length}</span></div></div><div className={seconds < 300 ? "timer danger" : "timer"}>◷ {time}</div><button type="button" className="ghost-button dark" onClick={onExit}>Exit</button></header>
+    <div className="exam-body">
+      <aside className="question-nav"><span className="eyebrow">QUESTIONS</span>{assessment.questions.map((q, i) => <button type="button" key={q.id} className={i === index ? "question-nav-item active" : "question-nav-item"} onClick={() => goToQuestion(i)}><span>{submittedQuestions.has(q.id) ? "✓" : i + 1}</span><div><b>{q.title}</b><small>{submittedQuestions.has(q.id) ? "Submitted" : i === index ? "In progress" : "Open"}</small></div></button>)}</aside>
+      <section className="problem-pane"><div className="problem-scroll">
+        <span className="eyebrow">PROBLEM {index + 1}</span><h1>{question.title}</h1><div className="problem-tags"><span>{question.language || "Java"}</span><span>{question.timeLimitSeconds}s limit</span></div>
+        <section className="problem-description"><h2>Problem description</h2><p>{question.description || "Read the requirements below and implement your solution."}</p></section>
+        <div className="problem-spec-grid"><section className="problem-spec"><h3>Input</h3><p>{question.inputDescription || "Input is provided through standard input."}</p></section><section className="problem-spec"><h3>Output</h3><p>{question.outputDescription || "Print the result to standard output."}</p></section></div>
+        {question.constraints && <section className="problem-constraints"><h3>Constraints</h3><pre>{question.constraints}</pre></section>}
+        <section className="sample-case-section"><div className="sample-section-heading"><div><span className="eyebrow">PUBLIC EXAMPLES</span><h2>Sample test cases</h2></div><span>{samples.length} examples</span></div>
+          {casesLoading ? <div className="muted">Loading sample cases…</div> : casesError ? <div className="alert error">Could not load test cases: {casesError}</div> : samples.length ? <div className="sample-case-grid">{samples.map((c, i) => <article className="sample-case-card" key={c.id || i}><div className="sample-case-title"><b>Example {i + 1}</b><span>Input / output</span></div><div className="sample-value"><span>INPUT</span><pre>{c.input}</pre></div><div className="sample-value"><span>EXPECTED OUTPUT</span><pre>{c.expectedOutput}</pre></div></article>)}</div> : <div className="empty-state compact"><strong>No public examples</strong><span>Use Run tests to evaluate against the assessment test cases.</span></div>}
+        </section>
+      </div></section>
+      <section className="editor-pane">
+        <div className="editor-top"><div><span className="eyebrow">CODE EDITOR</span><strong>{question.language || "Java 21"}</strong></div><span className="editor-status">Isolated execution</span></div>
+        <textarea className="ide" aria-label="Solution code" spellCheck="false" value={code} onPaste={() => record("paste", "Paste event in code editor")} onChange={e => { const value = e.target.value; setCode(value); setDrafts(previous => ({ ...previous, [question.id]: value })); record("code_edit", `${value.length} characters`); }}/>
+        <section className="console" aria-live="polite"><div className="console-head"><div><b>Test results</b><small>All assessment cases, including hidden cases</small></div>{result?.evaluation && <span className={result.evaluation.passed === result.evaluation.total ? "test-count pass" : "test-count fail"}>{result.evaluation.passed}/{result.evaluation.total} passed</span>}</div>
+          {result?.loading ? <div className="console-empty running-results"><span className="running-dot"/>Running every test case…</div> : result?.error ? <div className="console-empty error-text">{result.error}</div> : result?.evaluation ? <div className="console-body"><div className={result.evaluation.passed === result.evaluation.total ? "evaluation-banner passed" : "evaluation-banner failed"}><span>{result.evaluation.passed === result.evaluation.total ? "✓" : "×"}</span><strong>{result.evaluation.passed === result.evaluation.total ? "All test cases passed" : `${result.evaluation.total - result.evaluation.passed} test case${result.evaluation.total - result.evaluation.passed === 1 ? "" : "s"} failed`}</strong></div><div className="test-result-list">{(result.evaluation.results || []).map((r, i) => <article className={r.passed ? "test-result pass" : "test-result fail"} key={r.testCaseId || i}><span className="test-result-icon">{r.passed ? "✓" : "×"}</span><div className="test-result-copy"><b>Test case {i + 1}</b><small>{r.hidden ? "Hidden case" : "Sample case"}{r.executionTimeMs != null ? ` · ${r.executionTimeMs} ms` : ""}</small>{r.error && <pre>{r.error}</pre>}</div></article>)}</div></div> : <div className="console-empty">Press <b>Run tests</b> to check your code against every test case.</div>}
+        </section>
+        <div className="editor-actions"><button type="button" className="run-button" disabled={busy || graceSeconds <= 0 || casesLoading || Boolean(casesError) || !cases.length} onClick={runTests}>{busy ? "Running…" : "▶ Run tests"}</button><button type="button" className="primary-button submit-button" disabled={busy || graceSeconds <= 0 || casesLoading || Boolean(casesError) || !cases.length || submittedQuestions.has(question.id)} onClick={submit}>{busy ? "Working…" : submittedQuestions.has(question.id) ? "Solution submitted" : "Submit solution"}</button>{submittedQuestions.has(question.id) && index < assessment.questions.length - 1 && <button type="button" className="next-question-button" onClick={() => goToQuestion(index + 1)}>Next question →</button>}</div>
+        {seconds === 0 && graceSeconds > 0 && <div className="submission-grace" role="status">Time is up. Submit within {graceSeconds} seconds.</div>}{seconds === 0 && graceSeconds === 0 && <div className="submission-grace" role="status">The 10-second submission grace period has passed.</div>}
+      </section>
+    </div>
+  </div>;
 }
 
 function Submissions() {
@@ -458,6 +539,93 @@ function Submissions() {
 }
 
 function SubmissionDetail({ item: x }) { return <section className="panel submission-detail"><div className="detail-grid"><Metric label="Candidate" value={x.studentName}/><Metric label="Assessment" value={x.assessmentTitle}/><Metric label="Question" value={x.questionTitle}/><Metric label="Submitted" value={new Date(x.submittedAt).toLocaleString()}/></div><span className="eyebrow">SOURCE CODE</span><h2>Submitted solution</h2><pre className="submission-code">{x.sourceCode}</pre><span className="eyebrow">SESSION SUMMARY</span><h2>Activity</h2><div className="detail-grid"><Metric label="Source lines" value={x.sourceLines}/><Metric label="Characters" value={x.sourceCharacters}/><Metric label="Paste events" value={x.eventCounts?.paste || 0}/><Metric label="Focus changes" value={(x.eventCounts?.window_blur || 0) + (x.eventCounts?.visibility_hidden || 0)}/></div></section>; }
-function Candidates() { return <div className="page"><div className="page-intro"><span className="eyebrow">CANDIDATES</span><h1>Candidate management</h1><p>Candidate assignments are managed from the assessment builder.</p></div><section className="panel empty-state"><strong>Assignments are assessment-based</strong><span>Create an assessment, select questions, and enter registered student email addresses.</span></section></div>; }
+function Candidates({ onCreateAssignment, onReviewSubmissions }) {
+  const [assessments, setAssessments] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [assigned, submitted] = await Promise.all([
+        jsonFetch(ASSESSMENTS),
+        jsonFetch(`${SUBMISSIONS}/recruiter`),
+      ]);
+      setAssessments(Array.isArray(assigned) ? assigned : []);
+      setSubmissions(Array.isArray(submitted) ? submitted : []);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const candidates = useMemo(() => {
+    const byEmail = new Map();
+    const getCandidate = (email, name = "") => {
+      const key = String(email || "").trim().toLowerCase();
+      if (!key) return null;
+      if (!byEmail.has(key)) byEmail.set(key, { key, email: String(email).trim(), name: name || String(email).split("@")[0], assessments: new Map() });
+      const candidate = byEmail.get(key);
+      if (name) candidate.name = name;
+      return candidate;
+    };
+
+    assessments.forEach(assessment => (assessment.studentEmails || []).forEach(email => {
+      const candidate = getCandidate(email);
+      candidate.assessments.set(String(assessment.id), {
+        id: assessment.id,
+        title: assessment.title,
+        questionIds: (assessment.questions || []).map(question => question.id),
+        submittedIds: new Set(),
+        submittedAt: null,
+      });
+    }));
+
+    submissions.forEach(submission => {
+      const candidate = getCandidate(submission.studentEmail, submission.studentName);
+      if (!candidate) return;
+      const assessmentKey = String(submission.assessmentId);
+      if (!candidate.assessments.has(assessmentKey)) candidate.assessments.set(assessmentKey, {
+        id: submission.assessmentId,
+        title: submission.assessmentTitle,
+        questionIds: [],
+        submittedIds: new Set(),
+        submittedAt: null,
+      });
+      const assigned = candidate.assessments.get(assessmentKey);
+      assigned.submittedIds.add(submission.questionId);
+      assigned.submittedAt = !assigned.submittedAt || new Date(submission.submittedAt) > new Date(assigned.submittedAt) ? submission.submittedAt : assigned.submittedAt;
+    });
+
+    const query = search.trim().toLowerCase();
+    return [...byEmail.values()].map(candidate => {
+      const assignmentList = [...candidate.assessments.values()];
+      const totalQuestions = assignmentList.reduce((sum, assignment) => sum + assignment.questionIds.length, 0);
+      const submittedQuestions = assignmentList.reduce((sum, assignment) => sum + assignment.submittedIds.size, 0);
+      const completedAssessments = assignmentList.filter(assignment => assignment.questionIds.length > 0 && assignment.submittedIds.size >= assignment.questionIds.length).length;
+      return { ...candidate, assignmentList, totalQuestions, submittedQuestions, completedAssessments };
+    }).filter(candidate => `${candidate.name} ${candidate.email} ${candidate.assignmentList.map(a => a.title).join(" ")}`.toLowerCase().includes(query))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [assessments, submissions, search]);
+
+  return <div className="page">
+    <div className="page-intro row"><div><span className="eyebrow">CANDIDATE DIRECTORY</span><h1>Candidates</h1><p>Students assigned to your assessments, with their submission progress.</p></div><div className="header-actions"><button type="button" className="ghost-button" onClick={load}>Refresh</button><button type="button" className="primary-button" onClick={onCreateAssignment}>＋ Create assignment</button></div></div>
+    {error && <div className="alert error">{error}</div>}
+    <section className="panel candidate-panel"><div className="candidate-toolbar"><div><span className="eyebrow">ASSIGNED STUDENTS</span><h2>{loading ? "Loading candidates…" : `${candidates.length} candidate${candidates.length === 1 ? "" : "s"}`}</h2></div><input className="candidate-search" aria-label="Search candidates" type="search" placeholder="Search by name, email, or assignment" value={search} onChange={event => setSearch(event.target.value)}/></div>
+      {loading ? <div className="candidate-skeleton" aria-label="Loading candidate list"><i/><i/><i/></div> : candidates.length ? <div className="candidate-grid">{candidates.map(candidate => <article className="candidate-card" key={candidate.key}>
+        <div className="candidate-card-heading"><div className="candidate-avatar">{candidate.name.slice(0, 1).toUpperCase()}</div><div className="candidate-identity"><h3>{candidate.name}</h3><span>{candidate.email}</span></div><span className="candidate-count">{candidate.assignmentList.length} assignment{candidate.assignmentList.length === 1 ? "" : "s"}</span></div>
+        <div className="candidate-progress"><div><span>Question submissions</span><b>{candidate.submittedQuestions}{candidate.totalQuestions ? ` / ${candidate.totalQuestions}` : ""}</b></div><div className="progress-track"><i style={{ width: `${candidate.totalQuestions ? Math.min(100, candidate.submittedQuestions / candidate.totalQuestions * 100) : 0}%` }}/></div><small>{candidate.completedAssessments} assessment{candidate.completedAssessments === 1 ? "" : "s"} completed</small></div>
+        <div className="candidate-assignment-list">{candidate.assignmentList.map(assignment => <span key={assignment.id}>{assignment.title}</span>)}</div>
+        <button type="button" className="table-link" onClick={onReviewSubmissions}>Review submissions →</button>
+      </article>)}</div> : <div className="empty-state"><strong>{search ? "No matching candidates" : "No candidates assigned yet"}</strong><span>{search ? "Try a different name, email, or assignment title." : "Candidates appear here after you assign registered student emails to an assessment."}</span>{!search && <button type="button" className="primary-button" onClick={onCreateAssignment}>Create your first assignment</button>}</div>}
+    </section>
+  </div>;
+}
 
 export default App;
