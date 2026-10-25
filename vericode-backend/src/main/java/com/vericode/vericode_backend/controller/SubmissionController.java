@@ -2,6 +2,7 @@ package com.vericode.vericode_backend.controller;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
+import com.vericode.vericode_backend.Service.AssessmentAttemptService;
 import com.vericode.vericode_backend.dto.SubmissionRequestDTO;
 import com.vericode.vericode_backend.model.*;
 import com.vericode.vericode_backend.repository.*;
@@ -23,18 +24,21 @@ public class SubmissionController {
     private final QuestionRepository questions;
     private final UserAccountRepository users;
     private final ObjectMapper objectMapper;
+    private final AssessmentAttemptService attempts;
 
     public SubmissionController(SubmissionRepository submissions, AssessmentRepository assessments,
                                 QuestionRepository questions, UserAccountRepository users,
-                                ObjectMapper objectMapper) {
+                                ObjectMapper objectMapper, AssessmentAttemptService attempts) {
         this.submissions = submissions;
         this.assessments = assessments;
         this.questions = questions;
         this.users = users;
         this.objectMapper = objectMapper;
+        this.attempts = attempts;
     }
 
     @PostMapping
+    @Transactional
     public ResponseEntity<?> submit(@Valid @RequestBody SubmissionRequestDTO request, HttpSession session) {
         Integer userId = (Integer) session.getAttribute("userId");
         String role = (String) session.getAttribute("role");
@@ -53,6 +57,20 @@ public class SubmissionController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("message", "This question is not part of an assessment assigned to you."));
         }
+        AssessmentAttemptService.SubmissionStatus attemptStatus =
+                attempts.submissionStatus(assessment.getId(), userId);
+        if (attemptStatus == AssessmentAttemptService.SubmissionStatus.NOT_STARTED) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", "Start the assessment after confirming the recording notice before submitting."));
+        }
+        if (attemptStatus == AssessmentAttemptService.SubmissionStatus.EXPIRED) {
+            return ResponseEntity.status(HttpStatus.GONE)
+                    .body(Map.of("message", "The submission deadline and 10-second grace period have passed."));
+        }
+        if (attemptStatus == AssessmentAttemptService.SubmissionStatus.COMPLETE) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", "This assessment has already been submitted."));
+        }
 
         Submission submission = new Submission();
         submission.setAssessment(assessment);
@@ -67,11 +85,16 @@ public class SubmissionController {
             return ResponseEntity.badRequest().body(Map.of("message", "Behavior event data could not be processed."));
         }
 
-        Submission saved = submissions.save(submission);
+        Submission saved = submissions.saveAndFlush(submission);
+        long submittedQuestionCount = submissions.countDistinctQuestionsForAssessmentAndStudent(
+                assessment.getId(), userId);
+        boolean assessmentComplete = attempts.markCompleteIfAllQuestionsSubmitted(
+                assessment.getId(), userId, submittedQuestionCount, assessment.getQuestions().size());
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "id", saved.getId(),
                 "message", "Code submitted successfully.",
-                "submittedAt", saved.getSubmittedAt().toString()
+                "submittedAt", saved.getSubmittedAt().toString(),
+                "assessmentComplete", assessmentComplete
         ));
     }
 

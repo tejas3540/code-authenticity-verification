@@ -6,7 +6,10 @@ import com.vericode.vericode_backend.model.Question;
 import com.vericode.vericode_backend.model.TestCase;
 import com.vericode.vericode_backend.repository.QuestionRepository;
 import com.vericode.vericode_backend.repository.TestCaseRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
@@ -19,6 +22,7 @@ public class TestCaseService {
         this.questionRepository = questionRepository;
     }
 
+    @CacheEvict(cacheNames = "test-cases", allEntries = true)
     public TestCaseResponseDTO create(TestCaseRequestDTO request) {
         Question question = questionRepository.findById(request.getQuestionId())
                 .orElseThrow(() -> new IllegalArgumentException("Question not found"));
@@ -31,6 +35,8 @@ public class TestCaseService {
         return toResponse(testCaseRepository.save(testCase), false);
     }
 
+    @Transactional(readOnly = true)
+    @Cacheable(cacheNames = "test-cases", key = "#questionId + ':' + #studentView")
     public List<TestCaseResponseDTO> findForQuestion(Integer questionId, boolean studentView) {
         return testCaseRepository.findByQuestion_IdOrderByIdAsc(questionId)
                 .stream()
@@ -38,6 +44,7 @@ public class TestCaseService {
                 .toList();
     }
 
+    @CacheEvict(cacheNames = "test-cases", allEntries = true)
     public void delete(Integer id) {
         testCaseRepository.deleteById(id);
     }

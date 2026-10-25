@@ -4,7 +4,6 @@ import com.vericode.vericode_backend.Service.CodeExecutionService;
 import com.vericode.vericode_backend.dto.CodeEvaluationRequestDTO;
 import com.vericode.vericode_backend.dto.CodeExecutionRequestDTO;
 import com.vericode.vericode_backend.dto.CodeExecutionResponseDTO;
-import com.vericode.vericode_backend.model.Assessment;
 import com.vericode.vericode_backend.model.TestCase;
 import com.vericode.vericode_backend.repository.AssessmentRepository;
 import com.vericode.vericode_backend.repository.TestCaseRepository;
@@ -48,10 +47,7 @@ public class CodeExecutionController {
         if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         if (!"STUDENT".equals(session.getAttribute("role"))) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
-        boolean assignedQuestion = assessmentRepository.findDistinctByStudents_Id(userId).stream()
-                .map(Assessment::getQuestions)
-                .flatMap(List::stream)
-                .anyMatch(question -> question.getId().equals(request.getQuestionId()));
+        boolean assignedQuestion = assessmentRepository.isQuestionAssignedToStudent(userId, request.getQuestionId());
         if (!assignedQuestion) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("message", "This question is not part of an assessment assigned to you."));

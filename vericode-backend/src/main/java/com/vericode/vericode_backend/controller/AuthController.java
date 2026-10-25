@@ -4,7 +4,6 @@ import com.vericode.vericode_backend.Service.AuthService;
 import com.vericode.vericode_backend.dto.*;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,21 +12,30 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/Auth")
 public class AuthController {
 
-    @Autowired
-    private AuthService authService;
+    private final AuthService authService;
+
+    public AuthController(AuthService authService) {
+        this.authService = authService;
+    }
 
     @PostMapping("/register/student")
     public ResponseEntity<AuthResponseDTO> registerStudent(
-            @Valid @RequestBody StudentRegisterRequestDTO request) {
+            @Valid @RequestBody StudentRegisterRequestDTO request,
+            HttpSession session) {
+        AuthResponseDTO response = authService.registerStudent(request);
+        establishSession(session, response);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(authService.registerStudent(request));
+                .body(response);
     }
 
     @PostMapping("/register/recruiter")
     public ResponseEntity<AuthResponseDTO> registerRecruiter(
-            @Valid @RequestBody RecruiterRegisterRequestDTO request) {
+            @Valid @RequestBody RecruiterRegisterRequestDTO request,
+            HttpSession session) {
+        AuthResponseDTO response = authService.registerRecruiter(request);
+        establishSession(session, response);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(authService.registerRecruiter(request));
+                .body(response);
     }
 
     @PostMapping("/login")
@@ -35,9 +43,13 @@ public class AuthController {
             @Valid @RequestBody LoginRequestDTO request,
             HttpSession session) {
         AuthResponseDTO response = authService.login(request);
-        session.setAttribute("userId", response.getUserId());
-        session.setAttribute("role", response.getRole().name());
+        establishSession(session, response);
         return ResponseEntity.ok(response);
+    }
+
+    private void establishSession(HttpSession session, AuthResponseDTO user) {
+        session.setAttribute("userId", user.getUserId());
+        session.setAttribute("role", user.getRole().name());
     }
 
     @GetMapping("/me")

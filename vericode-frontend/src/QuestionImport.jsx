@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import "./QuestionImport.css";
 
-const AUTH_API = "http://localhost:8080/Auth";
-const QUESTION_API = "http://localhost:8080/Questions";
-const IMPORT_API = "http://localhost:8080/QuestionImport/preview";
+const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+const AUTH_API = `${API}/Auth`;
+const QUESTION_API = `${API}/Questions`;
+const IMPORT_API = `${API}/QuestionImport/preview`;
 
 const emptyForm = {
   title: "",
@@ -58,6 +60,7 @@ export default function QuestionImport() {
     try {
       const response = await fetch(IMPORT_API, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
@@ -89,6 +92,7 @@ export default function QuestionImport() {
     try {
       const response = await fetch(QUESTION_API, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, timeLimitSeconds: Number(form.timeLimitSeconds) }),
       });

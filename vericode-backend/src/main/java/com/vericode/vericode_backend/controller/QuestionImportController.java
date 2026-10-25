@@ -3,6 +3,7 @@ package com.vericode.vericode_backend.controller;
 import com.vericode.vericode_backend.Service.QuestionImportService;
 import com.vericode.vericode_backend.dto.QuestionImportRequestDTO;
 import com.vericode.vericode_backend.dto.QuestionImportResponseDTO;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +21,13 @@ public class QuestionImportController {
     }
 
     @PostMapping("/preview")
-    public ResponseEntity<?> preview(@Valid @RequestBody QuestionImportRequestDTO request) {
+    public ResponseEntity<?> preview(@Valid @RequestBody QuestionImportRequestDTO request, HttpSession session) {
+        if (session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        if (!"RECRUITER".equals(session.getAttribute("role"))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         try {
             QuestionImportResponseDTO result = questionImportService.preview(request.getUrl());
             return ResponseEntity.ok(result);

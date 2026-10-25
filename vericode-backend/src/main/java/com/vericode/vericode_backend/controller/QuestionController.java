@@ -23,16 +23,18 @@ public class QuestionController {
 
     @GetMapping
     public ResponseEntity<?> getAllQuestions(HttpSession session) {
-        if (session.getAttribute("userId") == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        ResponseEntity<?> accessError = recruiterAccessError(session);
+        if (accessError != null) {
+            return accessError;
         }
         return ResponseEntity.ok(questionService.getAllQuestions());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getQuestion(@PathVariable Integer id, HttpSession session) {
-        if (session.getAttribute("userId") == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        ResponseEntity<?> accessError = recruiterAccessError(session);
+        if (accessError != null) {
+            return accessError;
         }
         return ResponseEntity.ok(questionService.getQuestionById(id));
     }
@@ -41,8 +43,9 @@ public class QuestionController {
     public ResponseEntity<?> save(
             @Valid @RequestBody QuestionRequestDTO request,
             HttpSession session) {
-        if (!"RECRUITER".equals(session.getAttribute("role"))) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        ResponseEntity<?> accessError = recruiterAccessError(session);
+        if (accessError != null) {
+            return accessError;
         }
         QuestionResponseDTO response = questionService.save(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -53,8 +56,9 @@ public class QuestionController {
             @PathVariable Integer id,
             @Valid @RequestBody QuestionRequestDTO request,
             HttpSession session) {
-        if (!"RECRUITER".equals(session.getAttribute("role"))) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        ResponseEntity<?> accessError = recruiterAccessError(session);
+        if (accessError != null) {
+            return accessError;
         }
         QuestionResponseDTO response = questionService.updateQuestion(id, request);
         return ResponseEntity.ok(response);
@@ -62,10 +66,21 @@ public class QuestionController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteQuestion(@PathVariable Integer id, HttpSession session) {
-        if (!"RECRUITER".equals(session.getAttribute("role"))) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        ResponseEntity<?> accessError = recruiterAccessError(session);
+        if (accessError != null) {
+            return accessError;
         }
         QuestionResponseDTO response = questionService.deleteQuestion(id);
         return ResponseEntity.ok(response);
+    }
+
+    private ResponseEntity<?> recruiterAccessError(HttpSession session) {
+        if (session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        if (!"RECRUITER".equals(session.getAttribute("role"))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return null;
     }
 }

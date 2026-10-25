@@ -4,6 +4,8 @@ import com.vericode.vericode_backend.dto.QuestionRequestDTO;
 import com.vericode.vericode_backend.dto.QuestionResponseDTO;
 import com.vericode.vericode_backend.model.Question;
 import com.vericode.vericode_backend.repository.QuestionRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +17,7 @@ public class QuestionService {
     @Autowired
     private QuestionRepository questionRepository;
 
+    @CacheEvict(cacheNames = {"questions", "question"}, allEntries = true)
     public QuestionResponseDTO save(QuestionRequestDTO request) {
         Question question = new Question();
         mapRequestToQuestion(request, question);
@@ -23,6 +26,7 @@ public class QuestionService {
         return toResponseDTO(savedQuestion);
     }
 
+    @Cacheable("questions")
     public List<QuestionResponseDTO> getAllQuestions() {
         return questionRepository.findAll()
                 .stream()
@@ -30,6 +34,7 @@ public class QuestionService {
                 .toList();
     }
 
+    @Cacheable(value = "question", key = "#id")
     public QuestionResponseDTO getQuestionById(Integer id) {
         Question question = questionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -38,6 +43,7 @@ public class QuestionService {
         return toResponseDTO(question);
     }
 
+    @CacheEvict(cacheNames = {"questions", "question"}, allEntries = true)
     public QuestionResponseDTO updateQuestion(Integer id, QuestionRequestDTO request) {
         Question question = questionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -49,6 +55,7 @@ public class QuestionService {
         return toResponseDTO(updatedQuestion);
     }
 
+    @CacheEvict(cacheNames = {"questions", "question"}, allEntries = true)
     public QuestionResponseDTO deleteQuestion(Integer id) {
         Question question = questionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException(

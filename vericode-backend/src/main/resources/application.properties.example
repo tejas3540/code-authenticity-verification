@@ -1,14 +1,32 @@
 spring.application.name=vericode-backend
 
 # Local MySQL configuration — do not commit real credentials.
-spring.datasource.url=jdbc:mysql://localhost:3306/code_authentication
-spring.datasource.username=YOUR_DB_USERNAME
-spring.datasource.password=YOUR_DB_PASSWORD
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/code_authentication}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:YOUR_DB_USERNAME}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:YOUR_DB_PASSWORD}
 spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+spring.datasource.hikari.maximum-pool-size=${DB_POOL_MAX_SIZE:10}
+spring.datasource.hikari.minimum-idle=${DB_POOL_MIN_IDLE:2}
+spring.datasource.hikari.connection-timeout=30000
 
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=false
 spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.properties.hibernate.default_batch_fetch_size=50
 
-# Development frontend
-# CORS is configured in SecurityConfig for http://localhost:5173
+# Bounded in-memory cache for recruiter question and test-case reads.
+spring.cache.type=caffeine
+spring.cache.caffeine.spec=maximumSize=500,expireAfterWrite=300s
+
+# Existing databases are baselined at version 0; only additive migrations run.
+spring.flyway.baseline-on-migrate=true
+spring.flyway.baseline-version=0
+spring.flyway.clean-disabled=true
+
+# Set CORS_ALLOWED_ORIGINS to the deployed frontend origin(s), comma separated.
+app.cors.allowed-origins=${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
+# Compress larger API responses before sending them to the browser.
+server.compression.enabled=true
+server.compression.mime-types=application/json,text/html,text/xml,text/plain,text/css,text/javascript,application/javascript
+server.compression.min-response-size=1KB

@@ -3,8 +3,6 @@ package com.vericode.vericode_backend.controller;
 import com.vericode.vericode_backend.Service.TestCaseService;
 import com.vericode.vericode_backend.dto.TestCaseRequestDTO;
 import com.vericode.vericode_backend.dto.TestCaseResponseDTO;
-import com.vericode.vericode_backend.model.Assessment;
-import com.vericode.vericode_backend.model.Question;
 import com.vericode.vericode_backend.repository.AssessmentRepository;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -40,11 +38,7 @@ public class TestCaseController {
         if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
         if ("STUDENT".equals(role)) {
-            boolean assigned = assessmentRepository.findDistinctByStudents_Id(userId).stream()
-                    .map(Assessment::getQuestions)
-                    .flatMap(List::stream)
-                    .map(Question::getId)
-                    .anyMatch(questionId::equals);
+            boolean assigned = assessmentRepository.isQuestionAssignedToStudent(userId, questionId);
             if (!assigned) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } else if (!"RECRUITER".equals(role)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
