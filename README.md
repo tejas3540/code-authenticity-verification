@@ -82,9 +82,12 @@ Spring Boot REST API
 ### Backend
 
 1. Install JDK 21 and Maven.
-2. Create a MySQL database.
-3. Configure the database connection in the local `application.properties` file or environment configuration.
-4. Start the Spring Boot application.
+2. Install and start Docker Desktop. The backend runs student code in isolated Java containers, so Docker must be available on the backend computer.
+3. Create a MySQL database.
+4. Configure the database connection in the local `application.properties` file or environment configuration.
+5. Start the Spring Boot application.
+
+If Run tests reports that the isolated code runner is unavailable, confirm Docker Desktop is running on the computer hosting the backend and retry.
 
 ### Frontend
 

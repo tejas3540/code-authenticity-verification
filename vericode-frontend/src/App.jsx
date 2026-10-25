@@ -25,6 +25,12 @@ async function jsonFetch(url, options = {}) {
   return data;
 }
 
+function codeRunnerUnavailable(evaluation) {
+  return evaluation?.results?.some(result => result.error?.startsWith("Docker execution failed:"))
+    ? "The isolated code runner is unavailable. Start Docker Desktop on the backend computer, then retry."
+    : "";
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
@@ -394,7 +400,7 @@ function AssessmentConsent({ assessment, onCancel, onStart }) {
     finally { setBusy(false); }
   };
 
-  return <div className="page consent-page"><section className="panel consent-card"><span className="eyebrow">BEFORE YOU START</span><h1>{assessment.title}</h1><p>This timed assessment records the following activity and associates it with your submitted solutions:</p><ul><li>Code edit activity, including timestamps and code length</li><li>Paste events in the code editor</li><li>Code execution attempts</li><li>When this browser window loses focus or visibility and when it returns</li></ul><p>Your submitted source code and recorded activity are available to the recruiter for review. These signals are review indicators and do not prove misconduct.</p><label className="consent-check"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)}/><span>I have read and agree to this recording notice.</span></label>{error && <div className="alert error">{error}</div>}<div className="form-footer"><button type="button" className="ghost-button" onClick={onCancel}>Back</button><button type="button" className="primary-button" disabled={!confirmed || busy} onClick={start}>{busy ? "Starting…" : "I agree and start"}</button></div></section></div>;
+  return <div className="page consent-page"><section className="panel consent-card"><span className="eyebrow">BEFORE YOU START</span><h1>{assessment.title}</h1><div className="assessment-warning"><strong>Warning</strong><p>No copy/paste, no tab switching, and no cheating. Assessment activity may be recorded for recruiter review.</p><b>All the best!</b></div><label className="consent-check"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)}/><span>I understand these rules and agree to begin.</span></label>{error && <div className="alert error">{error}</div>}<div className="form-footer"><button type="button" className="ghost-button" onClick={onCancel}>Back</button><button type="button" className="primary-button" disabled={!confirmed || busy} onClick={start}>{busy ? "Starting…" : "Start assessment"}</button></div></section></div>;
 }
 
 function CodingWorkspace({ assessment, attempt, onExit }) {
@@ -404,6 +410,7 @@ function CodingWorkspace({ assessment, attempt, onExit }) {
   const [cases, setCases] = useState([]);
   const [casesLoading, setCasesLoading] = useState(true);
   const [casesError, setCasesError] = useState("");
+  const [caseReloadToken, setCaseReloadToken] = useState(0);
   const [result, setResult] = useState(null);
   const [seconds, setSeconds] = useState(attempt.remainingSeconds);
   const [graceSeconds, setGraceSeconds] = useState(attempt.graceSecondsRemaining);
@@ -428,6 +435,7 @@ function CodingWorkspace({ assessment, attempt, onExit }) {
     let mounted = true;
     async function loadCases() {
       setCasesLoading(true);
+      setCases([]);
       setCasesError("");
       try { const data = await jsonFetch(`${TESTCASES}/question/${question.id}`); if (mounted) setCases(data); }
       catch (e) { if (mounted) { setCases([]); setCasesError(e.message); } }
@@ -436,7 +444,7 @@ function CodingWorkspace({ assessment, attempt, onExit }) {
     }
     loadCases();
     return () => { mounted = false; };
-  }, [question.id]);
+  }, [question.id, caseReloadToken]);
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -464,12 +472,33 @@ function CodingWorkspace({ assessment, attempt, onExit }) {
     setResult(null);
   };
 
+  const updateCode = value => {
+    setCode(value);
+    setDrafts(previous => ({ ...previous, [question.id]: value }));
+    record("code_edit", `${value.length} characters`);
+  };
+
+  const handleEditorKeyDown = event => {
+    if (event.key !== "Tab" || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
+    event.preventDefault();
+    const editor = event.currentTarget;
+    const cursor = editor.selectionStart;
+    const nextCode = `${code.slice(0, cursor)}    ${code.slice(editor.selectionEnd)}`;
+    updateCode(nextCode);
+    requestAnimationFrame(() => {
+      editor.focus();
+      editor.setSelectionRange(cursor + 4, cursor + 4);
+    });
+  };
+
   const runTests = async () => {
     setBusy(true);
     setResult({ loading: true });
     record("code_run", "Run all assessment test cases");
     try {
       const evaluation = await jsonFetch(`${EXECUTION}/evaluate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ questionId: question.id, sourceCode: code }) });
+      const runnerError = codeRunnerUnavailable(evaluation);
+      if (runnerError) { setResult({ error: runnerError }); return; }
       setResult({ evaluation });
     } catch (e) { setResult({ error: e.message }); }
     finally { setBusy(false); }
@@ -484,6 +513,8 @@ function CodingWorkspace({ assessment, attempt, onExit }) {
     setResult({ loading: true });
     try {
       const evaluation = await jsonFetch(`${EXECUTION}/evaluate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ questionId: question.id, sourceCode: code }) });
+      const runnerError = codeRunnerUnavailable(evaluation);
+      if (runnerError) { setResult({ error: runnerError }); return; }
       const submitEvent = { eventType: "submit", occurredAt: new Date().toISOString(), details: `${evaluation.passed}/${evaluation.total} test cases passed` };
       const submission = await jsonFetch(SUBMISSIONS, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assessmentId: assessment.id, questionId: question.id, sourceCode: code, behaviorEvents: [...events, submitEvent] }) });
       setEvents([]);
@@ -509,12 +540,12 @@ function CodingWorkspace({ assessment, attempt, onExit }) {
         <div className="problem-spec-grid"><section className="problem-spec"><h3>Input</h3><p>{question.inputDescription || "Input is provided through standard input."}</p></section><section className="problem-spec"><h3>Output</h3><p>{question.outputDescription || "Print the result to standard output."}</p></section></div>
         {question.constraints && <section className="problem-constraints"><h3>Constraints</h3><pre>{question.constraints}</pre></section>}
         <section className="sample-case-section"><div className="sample-section-heading"><div><span className="eyebrow">PUBLIC EXAMPLES</span><h2>Sample test cases</h2></div><span>{samples.length} examples</span></div>
-          {casesLoading ? <div className="muted">Loading sample cases…</div> : casesError ? <div className="alert error">Could not load test cases: {casesError}</div> : samples.length ? <div className="sample-case-grid">{samples.map((c, i) => <article className="sample-case-card" key={c.id || i}><div className="sample-case-title"><b>Example {i + 1}</b><span>Input / output</span></div><div className="sample-value"><span>INPUT</span><pre>{c.input}</pre></div><div className="sample-value"><span>EXPECTED OUTPUT</span><pre>{c.expectedOutput}</pre></div></article>)}</div> : <div className="empty-state compact"><strong>No public examples</strong><span>Use Run tests to evaluate against the assessment test cases.</span></div>}
+          {casesLoading ? <div className="muted">Loading sample cases…</div> : casesError ? <div className="alert error case-load-error"><span>Could not load test cases: {casesError}</span><button type="button" className="ghost-button" onClick={() => setCaseReloadToken(value => value + 1)}>Retry</button></div> : samples.length ? <div className="sample-case-grid">{samples.map((c, i) => <article className="sample-case-card" key={c.id || i}><div className="sample-case-title"><b>Example {i + 1}</b><span>Input / output</span></div><div className="sample-value"><span>INPUT</span><pre>{c.input}</pre></div><div className="sample-value"><span>EXPECTED OUTPUT</span><pre>{c.expectedOutput}</pre></div></article>)}</div> : <div className="empty-state compact"><strong>No public examples</strong><span>Use Run tests to evaluate against the assessment test cases.</span></div>}
         </section>
       </div></section>
       <section className="editor-pane">
         <div className="editor-top"><div><span className="eyebrow">CODE EDITOR</span><strong>{question.language || "Java 21"}</strong></div><span className="editor-status">Isolated execution</span></div>
-        <textarea className="ide" aria-label="Solution code" spellCheck="false" value={code} onPaste={() => record("paste", "Paste event in code editor")} onChange={e => { const value = e.target.value; setCode(value); setDrafts(previous => ({ ...previous, [question.id]: value })); record("code_edit", `${value.length} characters`); }}/>
+        <textarea className="ide" aria-label="Solution code" spellCheck="false" value={code} onKeyDown={handleEditorKeyDown} onPaste={() => record("paste", "Paste event in code editor")} onChange={e => updateCode(e.target.value)}/>
         <section className="console" aria-live="polite"><div className="console-head"><div><b>Test results</b><small>All assessment cases, including hidden cases</small></div>{result?.evaluation && <span className={result.evaluation.passed === result.evaluation.total ? "test-count pass" : "test-count fail"}>{result.evaluation.passed}/{result.evaluation.total} passed</span>}</div>
           {result?.loading ? <div className="console-empty running-results"><span className="running-dot"/>Running every test case…</div> : result?.error ? <div className="console-empty error-text">{result.error}</div> : result?.evaluation ? <div className="console-body"><div className={result.evaluation.passed === result.evaluation.total ? "evaluation-banner passed" : "evaluation-banner failed"}><span>{result.evaluation.passed === result.evaluation.total ? "✓" : "×"}</span><strong>{result.evaluation.passed === result.evaluation.total ? "All test cases passed" : `${result.evaluation.total - result.evaluation.passed} test case${result.evaluation.total - result.evaluation.passed === 1 ? "" : "s"} failed`}</strong></div><div className="test-result-list">{(result.evaluation.results || []).map((r, i) => <article className={r.passed ? "test-result pass" : "test-result fail"} key={r.testCaseId || i}><span className="test-result-icon">{r.passed ? "✓" : "×"}</span><div className="test-result-copy"><b>Test case {i + 1}</b><small>{r.hidden ? "Hidden case" : "Sample case"}{r.executionTimeMs != null ? ` · ${r.executionTimeMs} ms` : ""}</small>{r.error && <pre>{r.error}</pre>}</div></article>)}</div></div> : <div className="console-empty">Press <b>Run tests</b> to check your code against every test case.</div>}
         </section>

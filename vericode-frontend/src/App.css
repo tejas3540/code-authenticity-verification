@@ -128,3 +128,15 @@ input:focus,textarea:focus,select:focus{border-color:#9b89ff;box-shadow:0 0 0 3p
 @media(max-width:1000px){.exam-shell{overflow:hidden}.exam-body{height:calc(100dvh - 58px);display:grid;grid-template-columns:minmax(0,1fr);overflow-y:auto}.question-nav{display:none}.problem-pane{height:auto;min-height:0;max-height:43vh;padding-bottom:0}.problem-scroll{height:auto;max-height:43vh;padding:18px}.editor-pane{position:relative;inset:auto;height:57vh;min-height:460px;flex:none;border-top:1px solid #39335e}.console{height:clamp(140px,24vh,190px)}.existing-assignment-grid,.candidate-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:760px){.assignment-tabs{width:100%;display:grid;grid-template-columns:1fr 1fr}.assignment-tab{justify-content:center;padding:10px 7px;font-size:9px}.existing-assignment-grid,.candidate-grid{grid-template-columns:1fr}.candidate-toolbar{align-items:stretch;flex-direction:column}.candidate-search{max-width:none}.assignment-skeleton,.candidate-skeleton{grid-template-columns:1fr}.assignment-skeleton i,.candidate-skeleton i{height:130px}.exam-header{height:56px}.exam-body{height:calc(100dvh - 56px)}.problem-pane{max-height:39vh}.problem-scroll{max-height:39vh}.editor-pane{height:61vh;min-height:460px}.console{height:clamp(135px,22vh,180px)}.editor-actions{gap:6px;padding:8px}.run-button,.submit-button,.next-question-button{padding:8px 9px;font-size:9px}.run-button{margin-right:auto}.problem-spec-grid{grid-template-columns:1fr}.problem-scroll h1{font-size:23px}.sample-case-section{margin-top:15px}.content{padding-bottom:32px}}
 @media(max-height:650px) and (min-width:1001px){.exam-body{grid-template-columns:200px minmax(300px,.92fr) minmax(360px,1.08fr)}.console{height:145px}.console-head{height:38px}.console-body,.console-empty{height:calc(100% - 38px);padding:8px}.ide{padding:12px}.editor-top{height:48px}.editor-actions{padding:6px 10px}.problem-scroll{padding-top:15px;padding-bottom:15px}}
+
+/* Keep the assessment workspace close to a split-pane coding challenge layout. */
+.exam-body{grid-template-columns:220px minmax(340px,.78fr) minmax(480px,1.22fr)}
+.ide{font-size:13px;line-height:1.7;padding:18px;overflow:auto;white-space:pre;tab-size:4}
+.console{height:clamp(140px,23vh,190px)}
+.assessment-warning{display:grid;gap:8px;margin:20px 0;padding:18px 20px;border:1px solid #f0c8b8;border-radius:12px;background:linear-gradient(135deg,#fff6ef,#fff0f1);color:#7b352c}
+.assessment-warning strong{text-transform:uppercase;letter-spacing:.1em;font-size:11px;color:#b33c48}
+.assessment-warning p{margin:0;color:#612e31;font-size:14px;font-weight:700;line-height:1.6}
+.assessment-warning b{color:#5838dc;font-size:13px}
+.case-load-error{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.case-load-error .ghost-button{flex:none;border-color:#e8b7b3;color:var(--danger)}
+@media(max-width:1100px){.exam-body{grid-template-columns:190px minmax(300px,.8fr) minmax(390px,1.2fr)}}
