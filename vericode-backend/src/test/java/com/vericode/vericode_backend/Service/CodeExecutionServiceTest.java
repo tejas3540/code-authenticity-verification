@@ -2,6 +2,7 @@ package com.vericode.vericode_backend.Service;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -19,5 +20,31 @@ class CodeExecutionServiceTest {
     @Test
     void leavesJavaCompilationErrorsAsCodeErrors() {
         assertFalse(service.isDockerUnavailableOutput("Main.java:5: error: ';' expected"));
+    }
+
+    @Test
+    void capturesOutputUntilConfiguredLimitAndMarksTruncation() {
+        CodeExecutionService.BoundedOutputCapture capture =
+                new CodeExecutionService.BoundedOutputCapture(5);
+        char[] firstChunk = "abc".toCharArray();
+        char[] secondChunk = "defgh".toCharArray();
+
+        capture.append(firstChunk, 0, firstChunk.length);
+        capture.append(secondChunk, 0, secondChunk.length);
+
+        assertEquals("abcde", capture.getOutput());
+        assertTrue(capture.isTruncated());
+    }
+
+    @Test
+    void doesNotMarkOutputTruncatedWhenItFitsWithinLimit() {
+        CodeExecutionService.BoundedOutputCapture capture =
+                new CodeExecutionService.BoundedOutputCapture(5);
+        char[] output = "abcde".toCharArray();
+
+        capture.append(output, 0, output.length);
+
+        assertEquals("abcde", capture.getOutput());
+        assertFalse(capture.isTruncated());
     }
 }
