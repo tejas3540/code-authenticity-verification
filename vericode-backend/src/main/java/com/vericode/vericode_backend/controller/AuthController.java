@@ -1,5 +1,9 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
 import com.vericode.vericode_backend.Service.AuthService;
 import com.vericode.vericode_backend.dto.*;
 import jakarta.servlet.http.HttpSession;
@@ -8,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@Tag(name = "Authentication", description = "Student and recruiter registration, login, current session and logout.")
 @RestController
 @RequestMapping("/Auth")
 public class AuthController {
@@ -18,6 +23,7 @@ public class AuthController {
         this.authService = authService;
     }
 
+    @Operation(summary = "Register a student account and start a session")
     @PostMapping("/register/student")
     public ResponseEntity<AuthResponseDTO> registerStudent(
             @Valid @RequestBody StudentRegisterRequestDTO request,
@@ -28,6 +34,7 @@ public class AuthController {
                 .body(response);
     }
 
+    @Operation(summary = "Register a recruiter account and start a session")
     @PostMapping("/register/recruiter")
     public ResponseEntity<AuthResponseDTO> registerRecruiter(
             @Valid @RequestBody RecruiterRegisterRequestDTO request,
@@ -38,6 +45,7 @@ public class AuthController {
                 .body(response);
     }
 
+    @Operation(summary = "Authenticate an existing student or recruiter")
     @PostMapping("/login")
     public ResponseEntity<AuthResponseDTO> login(
             @Valid @RequestBody LoginRequestDTO request,
@@ -52,6 +60,8 @@ public class AuthController {
         session.setAttribute("role", user.getRole().name());
     }
 
+    @Operation(summary = "Get the currently authenticated account")
+    @SecurityRequirement(name = "SessionCookie")
     @GetMapping("/me")
     public ResponseEntity<AuthResponseDTO> me(HttpSession session) {
         Integer userId = (Integer) session.getAttribute("userId");
@@ -61,6 +71,8 @@ public class AuthController {
         return ResponseEntity.ok(authService.getById(userId));
     }
 
+    @Operation(summary = "End the current authenticated session")
+    @SecurityRequirement(name = "SessionCookie")
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpSession session) {
         session.invalidate();
