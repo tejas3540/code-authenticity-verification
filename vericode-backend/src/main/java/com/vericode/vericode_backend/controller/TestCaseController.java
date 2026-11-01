@@ -1,5 +1,8 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
 import com.vericode.vericode_backend.Service.TestCaseService;
 import com.vericode.vericode_backend.dto.TestCaseRequestDTO;
 import com.vericode.vericode_backend.dto.TestCaseResponseDTO;
@@ -12,6 +15,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "Test Cases", description = "Create, read and delete question test cases with role-based visibility.")
+@SecurityRequirement(name = "SessionCookie")
 @RestController
 @RequestMapping("/TestCases")
 public class TestCaseController {
