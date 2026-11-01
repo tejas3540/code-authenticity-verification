@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - main
-      - "day-*"
+      - "day-**"
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
