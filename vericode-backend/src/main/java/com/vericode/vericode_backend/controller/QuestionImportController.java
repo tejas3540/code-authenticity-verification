@@ -1,5 +1,8 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
 import com.vericode.vericode_backend.Service.QuestionImportService;
 import com.vericode.vericode_backend.dto.QuestionImportRequestDTO;
 import com.vericode.vericode_backend.dto.QuestionImportResponseDTO;
@@ -11,6 +14,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+@Tag(name = "Question Import", description = "Preview coding questions imported from supported external URLs.")
+@SecurityRequirement(name = "SessionCookie")
 @RestController
 @RequestMapping("/QuestionImport")
 public class QuestionImportController {
