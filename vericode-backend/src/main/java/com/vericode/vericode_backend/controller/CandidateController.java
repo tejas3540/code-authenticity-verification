@@ -1,5 +1,7 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
@@ -25,6 +27,7 @@ public class CandidateController {
     private CandidateService candidateService;
 
     @GetMapping("/{id}")
+    @Operation(summary = "Get a candidate by ID")
     public ResponseEntity<CandidateResponseDTO> getCandidate(
             @PathVariable Integer id, HttpSession session) {
 
@@ -35,6 +38,7 @@ public class CandidateController {
     }
 
     @GetMapping
+    @Operation(summary = "List candidates")
     public ResponseEntity<List<CandidateResponseDTO>> getAllCandidates(HttpSession session) {
         HttpStatus accessError = recruiterAccessError(session);
         if (accessError != null) return ResponseEntity.status(accessError).build();
@@ -42,6 +46,7 @@ public class CandidateController {
     }
 
     @PostMapping
+    @Operation(summary = "Create a candidate")
     public ResponseEntity<CandidateResponseDTO> save(
             @Valid @RequestBody CandidateRequestDTO request, HttpSession session) {
 
@@ -56,6 +61,7 @@ public class CandidateController {
     }
 
     @PutMapping("/{id}")
+    @Operation(summary = "Update a candidate")
     public ResponseEntity<CandidateResponseDTO> updateCandidate(
             @PathVariable Integer id,
             @Valid @RequestBody CandidateRequestDTO request,
@@ -71,6 +77,7 @@ public class CandidateController {
     }
 
     @DeleteMapping("/{id}")
+    @Operation(summary = "Delete a candidate")
     public ResponseEntity<CandidateResponseDTO> deleteCandidate(
             @PathVariable Integer id, HttpSession session) {
 

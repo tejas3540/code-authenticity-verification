@@ -1,5 +1,7 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
@@ -39,6 +41,7 @@ public class CodeExecutionController {
     }
 
     @PostMapping("/run")
+    @Operation(summary = "Run Java source code with custom input")
     public ResponseEntity<?> run(@Valid @RequestBody CodeExecutionRequestDTO request, HttpSession session) {
         if (session.getAttribute("userId") == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         if (!"STUDENT".equals(session.getAttribute("role"))) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -47,6 +50,7 @@ public class CodeExecutionController {
     }
 
     @PostMapping("/evaluate")
+    @Operation(summary = "Evaluate a solution against the question test cases")
     public ResponseEntity<?> evaluate(@Valid @RequestBody CodeEvaluationRequestDTO request, HttpSession session) {
         Integer userId = (Integer) session.getAttribute("userId");
         if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();

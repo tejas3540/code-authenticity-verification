@@ -1,5 +1,7 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -27,6 +29,7 @@ public class AssessmentAttemptController {
     }
 
     @GetMapping("/{assessmentId}/attempt")
+    @Operation(summary = "Get the current student's assessment attempt and remaining time")
     public ResponseEntity<?> getAttempt(@PathVariable Integer assessmentId, HttpSession session) {
         Integer studentId = studentId(session);
         if (studentId == null) {
@@ -42,6 +45,7 @@ public class AssessmentAttemptController {
     }
 
     @PostMapping("/{assessmentId}/start")
+    @Operation(summary = "Start a timed assessment attempt after recording consent")
     public ResponseEntity<?> start(@PathVariable Integer assessmentId,
                                    @Valid @RequestBody StartAssessmentRequestDTO request,
                                    HttpSession session) {

@@ -1,5 +1,7 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
@@ -44,6 +46,7 @@ public class SubmissionController {
 
     @PostMapping
     @Transactional
+    @Operation(summary = "Submit a solution for an assessment question")
     public ResponseEntity<?> submit(@Valid @RequestBody SubmissionRequestDTO request, HttpSession session) {
         Integer userId = (Integer) session.getAttribute("userId");
         String role = (String) session.getAttribute("role");
@@ -105,6 +108,7 @@ public class SubmissionController {
 
     @GetMapping("/recruiter")
     @Transactional(readOnly = true)
+    @Operation(summary = "List submissions for the current recruiter")
     public ResponseEntity<?> getRecruiterSubmissions(HttpSession session) {
         Integer userId = (Integer) session.getAttribute("userId");
         String role = (String) session.getAttribute("role");

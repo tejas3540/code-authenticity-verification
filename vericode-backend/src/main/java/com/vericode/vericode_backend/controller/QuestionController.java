@@ -1,5 +1,7 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
@@ -27,6 +29,7 @@ public class QuestionController {
     }
 
     @GetMapping
+    @Operation(summary = "List coding questions")
     public ResponseEntity<?> getAllQuestions(HttpSession session) {
         ResponseEntity<?> accessError = recruiterAccessError(session);
         if (accessError != null) {
@@ -36,6 +39,7 @@ public class QuestionController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Get a coding question by ID")
     public ResponseEntity<?> getQuestion(@PathVariable Integer id, HttpSession session) {
         ResponseEntity<?> accessError = recruiterAccessError(session);
         if (accessError != null) {
@@ -45,6 +49,7 @@ public class QuestionController {
     }
 
     @PostMapping
+    @Operation(summary = "Create a coding question")
     public ResponseEntity<?> save(
             @Valid @RequestBody QuestionRequestDTO request,
             HttpSession session) {
@@ -57,6 +62,7 @@ public class QuestionController {
     }
 
     @PutMapping("/{id}")
+    @Operation(summary = "Update a coding question")
     public ResponseEntity<?> updateQuestion(
             @PathVariable Integer id,
             @Valid @RequestBody QuestionRequestDTO request,
@@ -70,6 +76,7 @@ public class QuestionController {
     }
 
     @DeleteMapping("/{id}")
+    @Operation(summary = "Delete a coding question")
     public ResponseEntity<?> deleteQuestion(@PathVariable Integer id, HttpSession session) {
         ResponseEntity<?> accessError = recruiterAccessError(session);
         if (accessError != null) {
