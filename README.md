@@ -118,6 +118,15 @@ The frontend is configured for the Vite development environment.
 - `/Assessments/{id}/attempt` — retrieve the server-timed attempt after opening an assessment
 - `/Assessments/{id}/start` — start once the student confirms the recording notice
 
+## API Documentation
+
+The backend publishes an interactive OpenAPI specification through Springdoc.
+
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+
+Register or log in through the Authentication endpoints first. The backend establishes an HTTP session using the `JSESSIONID` cookie; the browser can then send that cookie when calling protected endpoints from Swagger UI on the same backend origin. Endpoint role checks are enforced by the application controllers.
+
 ## Consent, timing, and database changes
 
 Before a student starts, the app explains that it records code edit activity, paste events, code runs, and when the assessment window loses focus or visibility. The student must confirm before the server creates an attempt. The server stores the consent and start times, calculates the deadline from the assessment duration, and returns the remaining time when the student reopens the assessment. A submission is accepted through the deadline plus a 10-second grace period.
