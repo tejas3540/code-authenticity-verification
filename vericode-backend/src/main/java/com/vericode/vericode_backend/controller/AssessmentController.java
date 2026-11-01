@@ -1,5 +1,8 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
 import com.vericode.vericode_backend.Service.AssessmentService;
 import com.vericode.vericode_backend.dto.AssessmentRequestDTO;
 import com.vericode.vericode_backend.dto.AssessmentResponseDTO;
@@ -11,6 +14,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "Assessments", description = "Create assessments and list assessments visible to the current account.")
+@SecurityRequirement(name = "SessionCookie")
 @RestController
 @RequestMapping("/Assessments")
 public class AssessmentController {
