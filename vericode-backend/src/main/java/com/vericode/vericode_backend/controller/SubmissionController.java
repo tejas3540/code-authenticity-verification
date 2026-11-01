@@ -1,5 +1,8 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.vericode.vericode_backend.Service.AssessmentAttemptService;
@@ -16,6 +19,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Tag(name = "Submissions", description = "Submit student solutions and review recruiter submissions.")
+@SecurityRequirement(name = "SessionCookie")
 @RestController
 @RequestMapping("/Submissions")
 public class SubmissionController {
