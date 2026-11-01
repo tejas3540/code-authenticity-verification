@@ -114,9 +114,20 @@ The frontend is configured for the Vite development environment.
 - `/Questions` — question management
 - `/Assessments` — assessment creation and retrieval
 - `/CodeExecution` — code execution and evaluation
+- `/QuestionImport/preview` — preview a question imported from an external URL
+- `/TestCases` — create and manage public/hidden question test cases
 - `/Submissions` — solution submission and recruiter review
 - `/Assessments/{id}/attempt` — retrieve the server-timed attempt after opening an assessment
 - `/Assessments/{id}/start` — start once the student confirms the recording notice
+
+## API Documentation
+
+The backend publishes an interactive OpenAPI specification through Springdoc.
+
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+
+Register or log in through the Authentication endpoints first. The backend establishes an HTTP session using the `JSESSIONID` cookie; the browser can then send that cookie when calling protected endpoints from Swagger UI on the same backend origin. Endpoint role checks are enforced by the application controllers.
 
 ## Consent, timing, and database changes
 

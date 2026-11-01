@@ -1,5 +1,10 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
 import com.vericode.vericode_backend.Service.CodeExecutionService;
 import com.vericode.vericode_backend.dto.CodeEvaluationRequestDTO;
 import com.vericode.vericode_backend.dto.CodeExecutionRequestDTO;
@@ -18,6 +23,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+@Tag(name = "Code Execution", description = "Run Java source code and evaluate it against assigned question test cases.")
+@SecurityRequirement(name = "SessionCookie")
 @RestController
 @RequestMapping("/CodeExecution")
 public class CodeExecutionController {
@@ -34,6 +41,7 @@ public class CodeExecutionController {
     }
 
     @PostMapping("/run")
+    @Operation(summary = "Run Java source code with custom input")
     public ResponseEntity<?> run(@Valid @RequestBody CodeExecutionRequestDTO request, HttpSession session) {
         if (session.getAttribute("userId") == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         if (!"STUDENT".equals(session.getAttribute("role"))) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -42,6 +50,7 @@ public class CodeExecutionController {
     }
 
     @PostMapping("/evaluate")
+    @Operation(summary = "Evaluate a solution against the question test cases")
     public ResponseEntity<?> evaluate(@Valid @RequestBody CodeEvaluationRequestDTO request, HttpSession session) {
         Integer userId = (Integer) session.getAttribute("userId");
         if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();

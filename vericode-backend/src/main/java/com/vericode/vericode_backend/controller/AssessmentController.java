@@ -1,5 +1,10 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
 import com.vericode.vericode_backend.Service.AssessmentService;
 import com.vericode.vericode_backend.dto.AssessmentRequestDTO;
 import com.vericode.vericode_backend.dto.AssessmentResponseDTO;
@@ -11,6 +16,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "Assessments", description = "Create assessments and list assessments visible to the current account.")
+@SecurityRequirement(name = "SessionCookie")
 @RestController
 @RequestMapping("/Assessments")
 public class AssessmentController {
@@ -21,6 +28,7 @@ public class AssessmentController {
     }
 
     @PostMapping
+    @Operation(summary = "Create a new assessment and assign it to students")
     public ResponseEntity<AssessmentResponseDTO> create(
             @Valid @RequestBody AssessmentRequestDTO request, HttpSession session) {
         Integer userId = (Integer) session.getAttribute("userId");
@@ -35,6 +43,7 @@ public class AssessmentController {
      * A user only receives assessments assigned to their current session account.
      */
     @GetMapping
+    @Operation(summary = "List assessments available to the current account")
     public ResponseEntity<List<AssessmentResponseDTO>> getAssessments(HttpSession session) {
         Integer userId = (Integer) session.getAttribute("userId");
         String role = (String) session.getAttribute("role");
@@ -43,6 +52,7 @@ public class AssessmentController {
     }
 
     @GetMapping("/my")
+    @Operation(summary = "List assessments assigned to or created by the current account")
     public ResponseEntity<List<AssessmentResponseDTO>> getMyAssessments(HttpSession session) {
         Integer userId = (Integer) session.getAttribute("userId");
         String role = (String) session.getAttribute("role");

@@ -1,5 +1,10 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.vericode.vericode_backend.Service.AssessmentAttemptService;
@@ -16,6 +21,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Tag(name = "Submissions", description = "Submit student solutions and review recruiter submissions.")
+@SecurityRequirement(name = "SessionCookie")
 @RestController
 @RequestMapping("/Submissions")
 public class SubmissionController {
@@ -39,6 +46,7 @@ public class SubmissionController {
 
     @PostMapping
     @Transactional
+    @Operation(summary = "Submit a solution for an assessment question")
     public ResponseEntity<?> submit(@Valid @RequestBody SubmissionRequestDTO request, HttpSession session) {
         Integer userId = (Integer) session.getAttribute("userId");
         String role = (String) session.getAttribute("role");
@@ -100,6 +108,7 @@ public class SubmissionController {
 
     @GetMapping("/recruiter")
     @Transactional(readOnly = true)
+    @Operation(summary = "List submissions for the current recruiter")
     public ResponseEntity<?> getRecruiterSubmissions(HttpSession session) {
         Integer userId = (Integer) session.getAttribute("userId");
         String role = (String) session.getAttribute("role");
