@@ -1,5 +1,8 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
 import com.vericode.vericode_backend.Service.CodeExecutionService;
 import com.vericode.vericode_backend.dto.CodeEvaluationRequestDTO;
 import com.vericode.vericode_backend.dto.CodeExecutionRequestDTO;
@@ -18,6 +21,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+@Tag(name = "Code Execution", description = "Run Java source code and evaluate it against assigned question test cases.")
+@SecurityRequirement(name = "SessionCookie")
 @RestController
 @RequestMapping("/CodeExecution")
 public class CodeExecutionController {
