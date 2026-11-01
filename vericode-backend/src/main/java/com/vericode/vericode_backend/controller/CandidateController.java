@@ -1,5 +1,8 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
 import com.vericode.vericode_backend.Service.CandidateService;
 import com.vericode.vericode_backend.dto.CandidateRequestDTO;
 import com.vericode.vericode_backend.dto.CandidateResponseDTO;
@@ -12,6 +15,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "Candidates", description = "Recruiter-only candidate management.")
+@SecurityRequirement(name = "SessionCookie")
 @RestController
 @RequestMapping("/Candidates")
 public class CandidateController {
