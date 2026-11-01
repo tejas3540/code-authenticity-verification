@@ -114,6 +114,8 @@ The frontend is configured for the Vite development environment.
 - `/Questions` — question management
 - `/Assessments` — assessment creation and retrieval
 - `/CodeExecution` — code execution and evaluation
+- `/QuestionImport/preview` — preview a question imported from an external URL
+- `/TestCases` — create and manage public/hidden question test cases
 - `/Submissions` — solution submission and recruiter review
 - `/Assessments/{id}/attempt` — retrieve the server-timed attempt after opening an assessment
 - `/Assessments/{id}/start` — start once the student confirms the recording notice
