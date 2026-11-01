@@ -1,5 +1,8 @@
 package com.vericode.vericode_backend.controller;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import com.vericode.vericode_backend.Service.AssessmentAttemptService;
 import com.vericode.vericode_backend.dto.StartAssessmentRequestDTO;
 import com.vericode.vericode_backend.repository.AssessmentRepository;
@@ -9,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@Tag(name = "Assessment Attempts", description = "Start and retrieve server-timed student assessment attempts.")
+@SecurityRequirement(name = "SessionCookie")
 @RestController
 @RequestMapping("/Assessments")
 public class AssessmentAttemptController {
