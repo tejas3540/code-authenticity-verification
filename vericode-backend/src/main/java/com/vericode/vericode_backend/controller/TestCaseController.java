@@ -33,8 +33,9 @@ public class TestCaseController {
     @PostMapping
     @Operation(summary = "Create a test case for a coding question")
     public ResponseEntity<?> create(@Valid @RequestBody TestCaseRequestDTO request, HttpSession session) {
-        if (!"RECRUITER".equals(session.getAttribute("role"))) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        HttpStatus accessError = recruiterAccessError(session);
+        if (accessError != null) {
+            return ResponseEntity.status(accessError).build();
         }
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(request));
     }
@@ -59,10 +60,21 @@ public class TestCaseController {
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a test case")
     public ResponseEntity<?> delete(@PathVariable Integer id, HttpSession session) {
-        if (!"RECRUITER".equals(session.getAttribute("role"))) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        HttpStatus accessError = recruiterAccessError(session);
+        if (accessError != null) {
+            return ResponseEntity.status(accessError).build();
         }
         service.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private HttpStatus recruiterAccessError(HttpSession session) {
+        if (session.getAttribute("userId") == null) {
+            return HttpStatus.UNAUTHORIZED;
+        }
+        if (!"RECRUITER".equals(session.getAttribute("role"))) {
+            return HttpStatus.FORBIDDEN;
+        }
+        return null;
     }
 }
