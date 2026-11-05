@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
 import com.vericode.vericode_backend.Service.AuthService;
 import com.vericode.vericode_backend.dto.*;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -27,9 +28,9 @@ public class AuthController {
     @PostMapping("/register/student")
     public ResponseEntity<AuthResponseDTO> registerStudent(
             @Valid @RequestBody StudentRegisterRequestDTO request,
-            HttpSession session) {
+            HttpServletRequest httpRequest) {
         AuthResponseDTO response = authService.registerStudent(request);
-        establishSession(session, response);
+        establishSession(httpRequest, response);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(response);
     }
@@ -38,9 +39,9 @@ public class AuthController {
     @PostMapping("/register/recruiter")
     public ResponseEntity<AuthResponseDTO> registerRecruiter(
             @Valid @RequestBody RecruiterRegisterRequestDTO request,
-            HttpSession session) {
+            HttpServletRequest httpRequest) {
         AuthResponseDTO response = authService.registerRecruiter(request);
-        establishSession(session, response);
+        establishSession(httpRequest, response);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(response);
     }
@@ -49,13 +50,25 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponseDTO> login(
             @Valid @RequestBody LoginRequestDTO request,
-            HttpSession session) {
+            HttpServletRequest httpRequest) {
         AuthResponseDTO response = authService.login(request);
-        establishSession(session, response);
+        establishSession(httpRequest, response);
         return ResponseEntity.ok(response);
     }
 
-    private void establishSession(HttpSession session, AuthResponseDTO user) {
+    /**
+     * Rotate an existing anonymous session ID before attaching authenticated
+     * identity attributes. This prevents an attacker-supplied pre-login
+     * session ID from being reused after authentication.
+     */
+    private void establishSession(HttpServletRequest request, AuthResponseDTO user) {
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            request.changeSessionId();
+        } else {
+            session = request.getSession(true);
+        }
+
         session.setAttribute("userId", user.getUserId());
         session.setAttribute("role", user.getRole().name());
     }
