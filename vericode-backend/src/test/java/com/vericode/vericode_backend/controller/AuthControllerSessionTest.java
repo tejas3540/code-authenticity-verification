@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -59,6 +60,29 @@ class AuthControllerSessionTest {
                 .andExpect(status().isOk())
                 .andExpect(request().sessionAttribute("userId", 21))
                 .andExpect(request().sessionAttribute("role", "STUDENT"));
+    }
+
+    @Test
+    void loginRotatesExistingSessionIdBeforeAuthentication() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        String originalSessionId = session.getId();
+
+        mockMvc.perform(post("/Auth/login")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "student@example.com",
+                                  "password": "StrongPass123",
+                                  "role": "STUDENT"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(request().sessionAttribute("userId", 21))
+                .andExpect(request().sessionAttribute("role", "STUDENT"));
+
+        assertNotEquals(originalSessionId, session.getId(),
+                "Authentication must rotate an existing pre-login session ID");
     }
 
     @Test
