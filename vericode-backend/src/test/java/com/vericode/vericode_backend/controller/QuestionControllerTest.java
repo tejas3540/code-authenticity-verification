@@ -21,6 +21,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -205,6 +206,48 @@ class QuestionControllerTest {
 
         mockMvc.perform(get("/Questions").session(candidateSession))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void unauthenticatedWriteRequestsAreRejectedBeforeCallingService() throws Exception {
+        mockMvc.perform(post("/Questions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request("Arrays", "Array problem"))))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/Questions/9")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request("Arrays", "Array problem"))))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(delete("/Questions/9"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(questionService);
+    }
+
+    @Test
+    void nonRecruiterWriteRequestsAreForbiddenBeforeCallingService() throws Exception {
+        MockHttpSession candidateSession = new MockHttpSession();
+        candidateSession.setAttribute("userId", 2);
+        candidateSession.setAttribute("role", "CANDIDATE");
+
+        mockMvc.perform(post("/Questions")
+                        .session(candidateSession)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request("Arrays", "Array problem"))))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/Questions/9")
+                        .session(candidateSession)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request("Arrays", "Array problem"))))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/Questions/9").session(candidateSession))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(questionService);
     }
 
     private QuestionRequestDTO request(String title, String description) {
