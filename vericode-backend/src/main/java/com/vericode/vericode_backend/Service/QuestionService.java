@@ -2,6 +2,7 @@ package com.vericode.vericode_backend.Service;
 
 import com.vericode.vericode_backend.dto.QuestionRequestDTO;
 import com.vericode.vericode_backend.dto.QuestionResponseDTO;
+import com.vericode.vericode_backend.exception.QuestionNotFoundException;
 import com.vericode.vericode_backend.model.Question;
 import com.vericode.vericode_backend.repository.QuestionRepository;
 import org.springframework.cache.annotation.CacheEvict;
@@ -37,7 +38,7 @@ public class QuestionService {
     @Cacheable(value = "question", key = "#id")
     public QuestionResponseDTO getQuestionById(Integer id) {
         Question question = questionRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new QuestionNotFoundException(
                         "Question not found with id " + id));
 
         return toResponseDTO(question);
@@ -46,7 +47,7 @@ public class QuestionService {
     @CacheEvict(cacheNames = {"questions", "question"}, allEntries = true)
     public QuestionResponseDTO updateQuestion(Integer id, QuestionRequestDTO request) {
         Question question = questionRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new QuestionNotFoundException(
                         "Question not found with id " + id));
 
         mapRequestToQuestion(request, question);
@@ -58,7 +59,7 @@ public class QuestionService {
     @CacheEvict(cacheNames = {"questions", "question"}, allEntries = true)
     public QuestionResponseDTO deleteQuestion(Integer id) {
         Question question = questionRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new QuestionNotFoundException(
                         "Question not found with id " + id));
 
         questionRepository.delete(question);

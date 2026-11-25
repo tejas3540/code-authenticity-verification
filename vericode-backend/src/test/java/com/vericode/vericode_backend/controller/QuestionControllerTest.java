@@ -1,15 +1,16 @@
 package com.vericode.vericode_backend.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.vericode.vericode_backend.Service.QuestionService;
 import com.vericode.vericode_backend.dto.QuestionRequestDTO;
 import com.vericode.vericode_backend.dto.QuestionResponseDTO;
+import com.vericode.vericode_backend.exception.QuestionNotFoundException;
 import com.vericode.vericode_backend.model.Language;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.mock.web.MockHttpSession;
@@ -19,7 +20,6 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -37,7 +37,7 @@ class QuestionControllerTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private ObjectMapper objectMapper;
+    private JsonMapper objectMapper;
 
     @MockitoBean
     private QuestionService questionService;
@@ -135,14 +135,49 @@ class QuestionControllerTest {
     }
 
     @Test
-    void nonexistentQuestionUsesCurrentIllegalArgumentExceptionMapping() throws Exception {
-        when(questionService.getQuestionById(404))
-                .thenThrow(new IllegalArgumentException("Question not found with id 404"));
-
-        // GlobalExceptionHandler currently maps IllegalArgumentException to 400, not 404.
-        mockMvc.perform(get("/Questions/404").session(recruiterSession))
+    void updateQuestionWithInvalidPayloadReturnsBadRequest() throws Exception {
+        mockMvc.perform(put("/Questions/9")
+                        .session(recruiterSession)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request("", "Updated description"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Enter question title"));
+    }
+
+    @Test
+    void getUnknownQuestionReturnsNotFound() throws Exception {
+        when(questionService.getQuestionById(404))
+                .thenThrow(new QuestionNotFoundException("Question not found with id 404"));
+
+        mockMvc.perform(get("/Questions/404").session(recruiterSession))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value("Question not found with id 404"));
+    }
+
+    @Test
+    void updateUnknownQuestionReturnsNotFound() throws Exception {
+        when(questionService.updateQuestion(eq(404), any(QuestionRequestDTO.class)))
+                .thenThrow(new QuestionNotFoundException("Question not found with id 404"));
+
+        mockMvc.perform(put("/Questions/404")
+                        .session(recruiterSession)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request("Arrays", "Array problem"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value("Question not found with id 404"));
+    }
+
+    @Test
+    void deleteUnknownQuestionReturnsNotFound() throws Exception {
+        when(questionService.deleteQuestion(404))
+                .thenThrow(new QuestionNotFoundException("Question not found with id 404"));
+
+        mockMvc.perform(delete("/Questions/404").session(recruiterSession))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message").value("Question not found with id 404"));
     }
 
