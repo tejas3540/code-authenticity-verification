@@ -2,6 +2,7 @@ package com.vericode.vericode_backend.Service;
 
 import com.vericode.vericode_backend.dto.QuestionRequestDTO;
 import com.vericode.vericode_backend.dto.QuestionResponseDTO;
+import com.vericode.vericode_backend.exception.QuestionNotFoundException;
 import com.vericode.vericode_backend.model.Language;
 import com.vericode.vericode_backend.model.Question;
 import com.vericode.vericode_backend.repository.QuestionRepository;
@@ -72,11 +73,11 @@ class QuestionServiceTest {
     }
 
     @Test
-    void getQuestionByIdThrowsWhenQuestionDoesNotExist() {
+    void getQuestionByIdThrowsQuestionNotFoundWhenQuestionDoesNotExist() {
         when(questionRepository.findById(404)).thenReturn(Optional.empty());
 
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
+        QuestionNotFoundException exception = assertThrows(
+                QuestionNotFoundException.class,
                 () -> questionService.getQuestionById(404));
 
         assertEquals("Question not found with id 404", exception.getMessage());
@@ -104,7 +105,7 @@ class QuestionServiceTest {
     void updateQuestionDoesNotSaveWhenQuestionDoesNotExist() {
         when(questionRepository.findById(404)).thenReturn(Optional.empty());
 
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(QuestionNotFoundException.class,
                 () -> questionService.updateQuestion(404, request("Title", "Description")));
 
         verify(questionRepository, never()).save(any(Question.class));
@@ -125,7 +126,7 @@ class QuestionServiceTest {
     void deleteQuestionDoesNotDeleteWhenQuestionDoesNotExist() {
         when(questionRepository.findById(404)).thenReturn(Optional.empty());
 
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(QuestionNotFoundException.class,
                 () -> questionService.deleteQuestion(404));
 
         verify(questionRepository, never()).delete(any(Question.class));

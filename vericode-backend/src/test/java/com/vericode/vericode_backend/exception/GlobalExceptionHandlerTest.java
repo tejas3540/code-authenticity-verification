@@ -23,6 +23,17 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void questionNotFoundReturnsNotFoundResponse() {
+        ResponseEntity<ErrorResponse> response = handler.handleQuestionNotFoundException(
+                new QuestionNotFoundException("Question not found with id 404"));
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertEquals(404, response.getBody().getStatus());
+        assertEquals("Question not found with id 404", response.getBody().getMessage());
+        assertNotNull(response.getBody().getTimestamp());
+    }
+
+    @Test
     void illegalArgumentReturnsBadRequestResponse() {
         ResponseEntity<ErrorResponse> response = handler.handleIllegalArgumentException(
                 new IllegalArgumentException("Assessment title is required"));
