@@ -70,6 +70,47 @@ class AssessmentAttemptServiceTest {
     }
 
     @Test
+    void startReusesExistingAttemptInsteadOfCreatingAnother() {
+        AssessmentAttempt existing = attemptWithDeadline(START.plusSeconds(120));
+        when(attempts.findByAssessment_IdAndStudent_Id(ASSESSMENT_ID, STUDENT_ID))
+                .thenReturn(Optional.of(existing));
+
+        var response = service.start(ASSESSMENT_ID, STUDENT_ID, true);
+
+        assertEquals(START, response.getStartedAt());
+        assertEquals(START.plusSeconds(120), response.getDeadlineAt());
+        verify(attempts, never()).save(any(AssessmentAttempt.class));
+        verifyNoInteractions(assessments, users);
+    }
+
+    @Test
+    void startRejectsAssessmentThatDoesNotExist() {
+        when(attempts.findByAssessment_IdAndStudent_Id(ASSESSMENT_ID, STUDENT_ID))
+                .thenReturn(Optional.empty());
+        when(assessments.findById(ASSESSMENT_ID)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.start(ASSESSMENT_ID, STUDENT_ID, true));
+
+        verify(assessments, never()).isStudentAssignedToAssessment(any(), any());
+        verify(attempts, never()).save(any(AssessmentAttempt.class));
+    }
+
+    @Test
+    void startRejectsAssessmentNotAssignedToStudent() {
+        when(attempts.findByAssessment_IdAndStudent_Id(ASSESSMENT_ID, STUDENT_ID))
+                .thenReturn(Optional.empty());
+        when(assessments.findById(ASSESSMENT_ID)).thenReturn(Optional.of(new Assessment()));
+        when(assessments.isStudentAssignedToAssessment(ASSESSMENT_ID, STUDENT_ID)).thenReturn(false);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.start(ASSESSMENT_ID, STUDENT_ID, true));
+
+        verify(users, never()).getReferenceById(any());
+        verify(attempts, never()).save(any(AssessmentAttempt.class));
+    }
+
+    @Test
     void refreshReturnsExistingAttemptAndServerCalculatedRemainingTime() {
         AssessmentAttempt attempt = attemptWithDeadline(START.plusSeconds(60));
         service = new AssessmentAttemptService(attempts, assessments, users,
@@ -83,6 +124,26 @@ class AssessmentAttemptServiceTest {
         assertEquals(START.plusSeconds(60), response.getDeadlineAt());
         assertEquals(30, response.getRemainingSeconds());
         verify(attempts, never()).save(any());
+    }
+
+    @Test
+    void submissionStatusIsNotStartedWhenNoAttemptExists() {
+        when(attempts.findByAssessment_IdAndStudent_Id(ASSESSMENT_ID, STUDENT_ID))
+                .thenReturn(Optional.empty());
+
+        assertEquals(AssessmentAttemptService.SubmissionStatus.NOT_STARTED,
+                service.submissionStatus(ASSESSMENT_ID, STUDENT_ID));
+    }
+
+    @Test
+    void submissionStatusIsCompleteWhenAttemptWasSubmitted() {
+        AssessmentAttempt attempt = attemptWithDeadline(START.plusSeconds(60));
+        attempt.setSubmittedAt(START.plusSeconds(45));
+        when(attempts.findByAssessment_IdAndStudent_Id(ASSESSMENT_ID, STUDENT_ID))
+                .thenReturn(Optional.of(attempt));
+
+        assertEquals(AssessmentAttemptService.SubmissionStatus.COMPLETE,
+                service.submissionStatus(ASSESSMENT_ID, STUDENT_ID));
     }
 
     @Test
@@ -100,6 +161,76 @@ class AssessmentAttemptServiceTest {
                 Clock.fixed(START.plusSeconds(70).plusNanos(1), ZoneOffset.UTC));
         assertEquals(AssessmentAttemptService.SubmissionStatus.EXPIRED,
                 service.submissionStatus(ASSESSMENT_ID, STUDENT_ID));
+    }
+
+    @Test
+    void completionRequiresAnExistingAttempt() {
+        when(attempts.findByAssessment_IdAndStudent_Id(ASSESSMENT_ID, STUDENT_ID))
+                .thenReturn(Optional.empty());
+
+        assertThrows(IllegalStateException.class,
+                () -> service.markCompleteIfAllQuestionsSubmitted(
+                        ASSESSMENT_ID, STUDENT_ID, 2, 2));
+
+        verify(attempts, never()).save(any(AssessmentAttempt.class));
+    }
+
+    @Test
+    void completionDoesNotOccurUntilEveryQuestionIsSubmitted() {
+        AssessmentAttempt attempt = attemptWithDeadline(START.plusSeconds(60));
+        when(attempts.findByAssessment_IdAndStudent_Id(ASSESSMENT_ID, STUDENT_ID))
+                .thenReturn(Optional.of(attempt));
+
+        boolean completed = service.markCompleteIfAllQuestionsSubmitted(
+                ASSESSMENT_ID, STUDENT_ID, 2, 3);
+
+        assertFalse(completed);
+        assertNull(attempt.getSubmittedAt());
+        verify(attempts, never()).save(any(AssessmentAttempt.class));
+    }
+
+    @Test
+    void completionRecordsServerTimestampWhenAllQuestionsAreSubmitted() {
+        AssessmentAttempt attempt = attemptWithDeadline(START.plusSeconds(60));
+        when(attempts.findByAssessment_IdAndStudent_Id(ASSESSMENT_ID, STUDENT_ID))
+                .thenReturn(Optional.of(attempt));
+        when(attempts.save(any(AssessmentAttempt.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        boolean completed = service.markCompleteIfAllQuestionsSubmitted(
+                ASSESSMENT_ID, STUDENT_ID, 3, 3);
+
+        assertTrue(completed);
+        assertEquals(START, attempt.getSubmittedAt());
+        verify(attempts).save(attempt);
+    }
+
+    @Test
+    void completionIsIdempotentForAnAlreadySubmittedAttempt() {
+        AssessmentAttempt attempt = attemptWithDeadline(START.plusSeconds(60));
+        Instant submittedAt = START.minusSeconds(5);
+        attempt.setSubmittedAt(submittedAt);
+        when(attempts.findByAssessment_IdAndStudent_Id(ASSESSMENT_ID, STUDENT_ID))
+                .thenReturn(Optional.of(attempt));
+
+        assertTrue(service.markCompleteIfAllQuestionsSubmitted(
+                ASSESSMENT_ID, STUDENT_ID, 1, 4));
+
+        assertEquals(submittedAt, attempt.getSubmittedAt());
+        verify(attempts, never()).save(any(AssessmentAttempt.class));
+    }
+
+    @Test
+    void zeroQuestionAssessmentIsNotAutomaticallyMarkedComplete() {
+        AssessmentAttempt attempt = attemptWithDeadline(START.plusSeconds(60));
+        when(attempts.findByAssessment_IdAndStudent_Id(ASSESSMENT_ID, STUDENT_ID))
+                .thenReturn(Optional.of(attempt));
+
+        assertFalse(service.markCompleteIfAllQuestionsSubmitted(
+                ASSESSMENT_ID, STUDENT_ID, 0, 0));
+
+        assertNull(attempt.getSubmittedAt());
+        verify(attempts, never()).save(any(AssessmentAttempt.class));
     }
 
     private AssessmentAttempt attemptWithDeadline(Instant deadline) {
